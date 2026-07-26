@@ -1,0 +1,38 @@
+{
+	"compilerOptions": {
+		"target": "esnext",
+		"module": "esnext",
+		"moduleResolution": "bundler",
+		"strict": true,
+		"jsx": "preserve",
+		"esModuleInterop": true,
+		"allowSyntheticDefaultImports": true,
+		"forceConsistentCasingInFileNames": true,
+		"useDefineForClassFields": true,
+		"skipLibCheck": true,
+		"sourceMap": true,
+		"paths": {
+			"@/*": [
+				"./src/*"
+			]
+		},
+		"lib": [
+			"esnext",
+			"dom",
+			"dom.iterable"
+		],
+		"types": [
+			"vitest/globals",
+			"node"
+		]
+	},
+	"include": [
+		"src/**/*.ts",
+		"src/**/*.tsx",
+		"src/**/*.vue",
+		"*.config.ts"
+	],
+	"exclude": [
+		"node_modules"
+	]
+}

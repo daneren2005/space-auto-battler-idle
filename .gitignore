@@ -1,0 +1,8 @@
+node_modules
+dist
+*.log
+.claude
+NOTES.md
+test-results
+playwright-report
+.playwright

@@ -1,0 +1,43 @@
+{
+	"name": "space-auto-battler-idle",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"serve": "vite",
+		"build": "vite build",
+		"preview": "vite preview",
+		"type-check": "vue-tsc --noEmit",
+		"lint": "cross-env NODE_ENV=production oxlint .",
+		"lint:fix": "cross-env NODE_ENV=production oxlint --fix .",
+		"start": "npm run dev",
+		"test:unit": "vitest run",
+		"test:e2e": "playwright test",
+		"prepare": "husky"
+	},
+	"dependencies": {
+		"@daneren2005/shared-memory-ecs": "^1.1.1",
+		"@daneren2005/shared-memory-objects": "^1.0.0",
+		"flatbush": "^4.5.1",
+		"phaser": "^3.90.0",
+		"pretty-bytes": "^7.1.1",
+		"vue": "^3.5.31"
+	},
+	"devDependencies": {
+		"@playwright/test": "^1.62.0",
+		"@stylistic/eslint-plugin": "^5.10.0",
+		"@types/node": "^26.1.1",
+		"@vitejs/plugin-vue": "^6.0.5",
+		"@vitest/web-worker": "^4.1.10",
+		"cross-env": "^10.1.0",
+		"husky": "^9.1.7",
+		"lint-staged": "^17.0.8",
+		"oxlint": "1.73.0",
+		"oxlint-tsgolint": "^0.24.0",
+		"typescript": "~6.0.2",
+		"vite": "^8.1.4",
+		"vitest": "^4.1.10",
+		"vue-tsc": "^3.2.6"
+	}
+}

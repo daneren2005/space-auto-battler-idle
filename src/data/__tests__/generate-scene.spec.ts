@@ -10,7 +10,7 @@ describe('generateScene', () => {
 
 		scene.entities.forEach(entity => {
 			expect(entity.type).toBe('station');
-			expect(entity.money).toBe(20);
+			expect(entity.openShips).toBe(20);
 			expect(entity.x).toBeGreaterThanOrEqual(0);
 			expect(entity.x).toBeLessThanOrEqual(800);
 			expect(entity.y).toBeGreaterThanOrEqual(0);

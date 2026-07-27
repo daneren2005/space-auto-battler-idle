@@ -22,7 +22,7 @@ export default function generateScene(options: OptionsConfig) {
 			y,
 			type: 'station',
 			color: colors[i] ?? Math.floor(Math.random() * 16777215),
-			money: options.shipsPerStation ?? 10,
+			openShips: options.shipsPerStation ?? 10,
 		});
 	}
 

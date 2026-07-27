@@ -5,11 +5,6 @@
 			<div v-for="system in systemUpdates" :key="system.name">{{ system.name }}: {{ system.max.toFixed(2) }} ({{ system.avg.toFixed(2) }} avg) ms</div>
 			<div></div>
 			<div>Memory: {{ memory }}</div>
-			<p/>
-
-			<div>Entities: {{ stationsCount }} stations and {{ shipsCount }} ships ({{ totalCount }})</div>
-			<span class="station-list" v-for="station in stationShips" :key="station.color" :style="{ color: station.displayColor }">{{ '#' + station.color.toString(16) }}: {{ station.ships }}</span>
-			<div><button @click="addShips">Add Ships</button></div>
 		</div>
 
 		<div id="phaser-container"/>
@@ -19,8 +14,12 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, Ref } from 'vue';
 import Phaser from 'phaser';
+import { levels, firstLevel } from '@/data/levels';
+import { loadProgress } from '@/data/progress';
+import { DISPLAY_WIDTH, DISPLAY_HEIGHT } from './display';
 import GameWorld from './entities/game-world';
 import GameScene from './game-scene';
+import UIScene from './ui-scene';
 import type { GameStats, StationShipStat, SystemStat } from './game-scene';
 
 let world: GameWorld;
@@ -37,20 +36,31 @@ let game: Phaser.Game | null;
 onMounted(() => {
 	world = new GameWorld();
 
-	const width = window.innerWidth / 3 * 2;
-	const height = window.innerHeight / 3 * 2;
+	// Resume at the saved level with the upgrades / money carried over from earlier levels.
+	const progress = loadProgress();
+	const level = levels[progress.levelIndex] ?? firstLevel;
 
 	game = new Phaser.Game({
 		type: Phaser.AUTO,
-		width,
-		height,
+		// Fixed canvas resolution: the game camera zooms to fit the level's world into it, so the UI stays a
+		// constant size no matter how big or small the level's bounds are.
+		width: DISPLAY_WIDTH,
+		height: DISPLAY_HEIGHT,
 		parent: 'phaser-container',
-		scene: new GameScene({
-			world,
-			width,
-			height,
-			onStats,
-		}),
+		backgroundColor: '#05070f',
+		scale: {
+			mode: Phaser.Scale.FIT,
+			autoCenter: Phaser.Scale.CENTER_BOTH,
+		},
+		scene: [
+			new GameScene({
+				world,
+				level,
+				carry: progress.carry,
+				onStats,
+			}),
+			new UIScene(),
+		],
 	});
 });
 onBeforeUnmount(() => {
@@ -74,14 +84,6 @@ function onStats(stats: GameStats) {
 	stationShips.value = stats.stationShips;
 	systemUpdates.value = stats.systemUpdates;
 }
-
-function addShips() {
-	world.entities.forEach(entity => {
-		if(entity.components.controller) {
-			entity.components.controller.money += 10;
-		}
-	});
-}
 </script>
 
 <style scoped>
@@ -90,5 +92,11 @@ function addShips() {
 }
 .station-list {
 	margin-left: 0.5em;
+}
+/* Give Phaser's parent a determinate size.  With Scale.FIT and an auto-sized parent the canvas and its
+   container feed back into each other and the canvas grows every resize; a fixed box breaks that loop. */
+#phaser-container {
+	width: 100%;
+	height: 80vh;
 }
 </style>

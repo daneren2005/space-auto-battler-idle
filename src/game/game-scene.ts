@@ -1,9 +1,13 @@
 import Phaser from 'phaser';
-import generateScene from '@/data/generate-scene';
 import prettyMemory from '@/data/pretty-memory';
+import type { LevelConfig } from '@/data/levels';
+import { getLevelIndex } from '@/data/levels';
+import type { Carry } from '@/data/progress';
+import { saveProgress, resetProgress } from '@/data/progress';
+import { CONTROLLER_MONEY, CONTROLLER_OPEN_SHIPS, CONTROLLER_SHIP_SHIELDS } from './components/controller';
 import type GameWorld from './entities/game-world';
 
-// A single station's ship tally, used to render the per-team breakdown in the UI panel.
+// A single station's ship tally, used to render the per-team breakdown in the debug panel.
 export interface StationShipStat {
 	eid: number
 	color: number
@@ -18,8 +22,8 @@ export interface SystemStat {
 	max: number
 }
 
-// A full snapshot of everything the UI panel displays.  The scene owns the game loop and worker timing, so it
-// is the single source of truth for these numbers; the Vue component is purely presentational.
+// A full snapshot of everything the debug panel displays.  The scene owns the game loop and worker timing, so
+// it is the single source of truth for these numbers; the Vue component is purely presentational.
 export interface GameStats {
 	maxUpdateTime: number
 	avgUpdateTime: number
@@ -31,25 +35,35 @@ export interface GameStats {
 	systemUpdates: Array<SystemStat>
 }
 
+// Whether the match is still being played, or has been won / lost by the player.
+export type GameState = 'playing' | 'won' | 'lost';
+
 export interface GameSceneOptions {
 	world: GameWorld
-	width: number
-	height: number
-	// Called roughly once per second with a fresh snapshot of the game's stats.
+	level: LevelConfig
+	// Upgrades / money carried over from earlier levels, applied to the player's station on load.
+	carry: Carry
+	// Called roughly once per second with a fresh snapshot of the game's debug stats.
 	onStats: (stats: GameStats) => void
 }
 
-// The Phaser scene that plays the shared-memory-ecs game: it loads the sprites, kicks off the world, and every
-// frame runs the simulation and syncs a sprite (+ shield) for each live entity.  All timing/stat collection
-// lives here and is pushed out via `onStats` so the surrounding Vue component only has to render.
+// The Phaser scene that plays the shared-memory-ecs game: it loads the level, kicks off the world, and every
+// frame runs the simulation and syncs a sprite (+ shield) for each live entity.  It also owns the "game" side
+// of the meta-game: which faction the player is, that faction's kill-reward money, buying openShip upgrades,
+// and detecting a win (no enemies left) or loss (the player's station destroyed).  The sci-fi HUD, upgrade
+// panel and win/lose dialogs are drawn by the parallel UIScene, which reads this scene's public getters.
 export default class GameScene extends Phaser.Scene {
 	private world: GameWorld;
-	private worldWidth: number;
-	private worldHeight: number;
+	private level: LevelConfig;
+	private carry: Carry;
 	private onStats: (stats: GameStats) => void;
 
 	private paused = false;
 	private eidSpriteMap = new Map<number, any>();
+
+	// The station eid the human plays; -1 until the level is loaded.  Only this faction's money is spendable.
+	private playerStationEid = -1;
+	private state: GameState = 'playing';
 
 	private updateTicks = 0;
 	private updateTimes: Array<number> = [];
@@ -63,8 +77,8 @@ export default class GameScene extends Phaser.Scene {
 	constructor(options: GameSceneOptions) {
 		super('game');
 		this.world = options.world;
-		this.worldWidth = options.width;
-		this.worldHeight = options.height;
+		this.level = options.level;
+		this.carry = options.carry;
 		this.onStats = options.onStats;
 	}
 
@@ -75,12 +89,16 @@ export default class GameScene extends Phaser.Scene {
 	}
 
 	create() {
-		this.world.load(generateScene({
-			stations: 10,
-			shipsPerStation: 100,
-			width: this.worldWidth,
-			height: this.worldHeight,
-		}));
+		this.world.load({ entities: this.level.entities, bounds: this.level.bounds });
+
+		// The canvas is a fixed size (DISPLAY_*); zoom the game camera so this level's world bounds fill it and
+		// centre it on the world.  A small level zooms in, a large one zooms out - either way the UIScene, which
+		// has its own camera, is untouched, so the HUD/menus never change size with the level.
+		const { width, height } = this.scale;
+		const bounds = this.level.bounds;
+		const zoom = Math.min(width / bounds.width, height / bounds.height);
+		this.cameras.main.setZoom(zoom);
+		this.cameras.main.centerOn(bounds.width / 2, bounds.height / 2);
 
 		// Record each system's worker run time so the panel can show off-thread cost.
 		this.world.systems.forEach(system => {
@@ -116,16 +134,36 @@ export default class GameScene extends Phaser.Scene {
 			};
 		});
 
+		// The player faction is the (single) controller flagged `player` in the level.
+		this.playerStationEid = stations.find(station => station.components.controller!.player)?.eid ?? -1;
+
+		// Apply carried-over progress on top of this level's bases for the player.  Nothing has simulated yet,
+		// so plain writes here are safe (no worker is touching the block until the first update next frame).
+		const playerController = this.playerController;
+		if(playerController) {
+			playerController.openShips += this.carry.openShipUpgrades;
+			playerController.shipShields += this.carry.shieldUpgrades;
+			playerController.money += this.carry.money;
+			// Keep the upgrade counts cumulative so the next upgrade's cost continues from where it left off.
+			playerController.upgrades += this.carry.openShipUpgrades;
+			playerController.shieldUpgrades += this.carry.shieldUpgrades;
+		}
+
 		this.input.keyboard?.on('keydown-SPACE', () => {
-			this.paused = !this.paused;
+			if(this.state === 'playing') {
+				this.paused = !this.paused;
+			}
 		});
+
+		// Draw the HUD / dialogs on top; it reads this scene back via this.scene.get('game').
+		this.scene.launch('ui');
 
 		// Push an initial snapshot so the panel is populated before the first reporting window elapses.
 		this.refreshStats();
 	}
 
 	update(time: number, delta: number) {
-		if(this.paused) {
+		if(this.paused || this.state !== 'playing') {
 			return;
 		}
 
@@ -155,6 +193,8 @@ export default class GameScene extends Phaser.Scene {
 			sprite.shieldImage.visible = (entity.components.health?.shields ?? 0) > 0;
 		});
 
+		this.checkForGameOver();
+
 		let end = performance.now();
 		this.updateTimes.push(end - start);
 		this.updateTicks += delta;
@@ -168,8 +208,144 @@ export default class GameScene extends Phaser.Scene {
 		}
 	}
 
-	private hasComponent(eid: number, name: 'controller' | 'controlled'): boolean {
-		return !!this.world.getEntityByEid(eid)?.components[name];
+	// --- Meta-game state the UIScene renders ------------------------------------------------------------
+
+	get gameState(): GameState {
+		return this.state;
+	}
+
+	get levelTitle(): string {
+		return this.level.title;
+	}
+
+	// The player faction's kill-reward money.  A plain read is fine for display; workers only ever add to it.
+	get playerMoney(): number {
+		return this.playerController?.money ?? 0;
+	}
+
+	// Ship slots this faction can still spend, plus the ships already flying.
+	get playerOpenShips(): number {
+		return this.playerController?.openShips ?? 0;
+	}
+	get playerShips(): number {
+		return this.world.entities.filter(entity => entity.components.controlled?.owner === this.playerStationEid).length;
+	}
+	// The biggest fleet this faction could field right now: the ships already flying plus the unspent slots each
+	// of which will become another ship.
+	get playerTotalFleet(): number {
+		return this.playerShips + this.playerOpenShips;
+	}
+
+	// Cost of the next openShip upgrade: 1, 2, 4, 8, ... (doubles with each one bought).
+	get upgradeCost(): number {
+		return 2 ** (this.playerController?.upgrades ?? 0);
+	}
+	get canAffordUpgrade(): boolean {
+		const controller = this.playerController;
+		return !!controller && controller.money >= this.upgradeCost;
+	}
+
+	// Spend money to add one openShip slot to the player's bank.  Returns whether the purchase went through.
+	buyUpgrade(): boolean {
+		const controller = this.playerController;
+		if(!controller || controller.money < this.upgradeCost) {
+			return false;
+		}
+
+		const cost = this.upgradeCost;
+		// money + openShips are also mutated by collision/spawn workers on other threads, so touch the shared
+		// block atomically; upgrades is only ever written here, so a plain increment is safe.
+		const block = this.world.registry.controller.memoryComponent.getBlock(controller.index) as Int32Array;
+		Atomics.sub(block, CONTROLLER_MONEY, cost);
+		Atomics.add(block, CONTROLLER_OPEN_SHIPS, 1);
+		controller.upgrades += 1;
+		return true;
+	}
+
+	// The player faction's per-ship shield count, and the exponential cost of the next shield upgrade: 5, 10,
+	// 20, 40, ... (starts at 5, doubles each time).
+	get playerShipShields(): number {
+		return this.playerController?.shipShields ?? 0;
+	}
+	get shieldUpgradeCost(): number {
+		return 5 * 2 ** (this.playerController?.shieldUpgrades ?? 0);
+	}
+	get canAffordShieldUpgrade(): boolean {
+		const controller = this.playerController;
+		return !!controller && controller.money >= this.shieldUpgradeCost;
+	}
+
+	// Spend money to give every future ship this faction spawns one more shield.  Returns whether it went through.
+	buyShieldUpgrade(): boolean {
+		const controller = this.playerController;
+		if(!controller || controller.money < this.shieldUpgradeCost) {
+			return false;
+		}
+
+		const cost = this.shieldUpgradeCost;
+		// money is mutated by collision workers and shipShields is read by the spawn worker, so touch the shared
+		// block atomically; shieldUpgrades is only ever written here, so a plain increment is safe.
+		const block = this.world.registry.controller.memoryComponent.getBlock(controller.index) as Int32Array;
+		Atomics.sub(block, CONTROLLER_MONEY, cost);
+		Atomics.add(block, CONTROLLER_SHIP_SHIELDS, 1);
+		controller.shieldUpgrades += 1;
+		return true;
+	}
+
+	// --- Win/lose dialog + level progression ------------------------------------------------------------
+
+	get hasNextLevel(): boolean {
+		return !!this.level.nextLevel && getLevelIndex(this.level.nextLevel) >= 0;
+	}
+
+	get dialogButtonLabel(): string {
+		if(this.state === 'won') {
+			return this.hasNextLevel ? 'Next Level' : 'Play Again';
+		}
+		return 'Retry';
+	}
+
+	// Fired by the dialog button.  A win advances to (and persists) the next level carrying the player's upgrades
+	// forward - or, after the last level, wipes progress for a fresh run.  A loss leaves the saved progress alone
+	// so the reload simply retries this level with the same carry it started with.  A reload is the cleanest
+	// reliable reset of the world + workers.
+	dialogAction(): void {
+		if(this.state === 'won' && this.level.nextLevel) {
+			const nextIndex = getLevelIndex(this.level.nextLevel);
+			if(nextIndex >= 0) {
+				saveProgress({ levelIndex: nextIndex, carry: this.currentCarry() });
+			}
+		} else if(this.state === 'won') {
+			resetProgress();
+		}
+		window.location.reload();
+	}
+
+	private currentCarry(): Carry {
+		const controller = this.playerController;
+		return {
+			openShipUpgrades: controller?.upgrades ?? 0,
+			shieldUpgrades: controller?.shieldUpgrades ?? 0,
+			money: controller?.money ?? 0,
+		};
+	}
+
+	private get playerController() {
+		return this.world.getEntityByEid(this.playerStationEid)?.components.controller;
+	}
+
+	private checkForGameOver() {
+		const controllers = this.world.entities.filter(entity => entity.components.controller);
+		const playerAlive = controllers.some(entity => entity.eid === this.playerStationEid);
+		if(!playerAlive) {
+			this.state = 'lost';
+			return;
+		}
+
+		const enemiesAlive = controllers.some(entity => entity.eid !== this.playerStationEid);
+		if(!enemiesAlive) {
+			this.state = 'won';
+		}
 	}
 
 	private getTint(eid: number): number {
@@ -180,6 +356,10 @@ export default class GameScene extends Phaser.Scene {
 			return this.world.getEntityByEid(entity.components.controlled.owner)?.components.controller?.color ?? 0xffffff;
 		}
 		return 0xffffff;
+	}
+
+	private hasComponent(eid: number, name: 'controller' | 'controlled'): boolean {
+		return !!this.world.getEntityByEid(eid)?.components[name];
 	}
 
 	private refreshStats() {

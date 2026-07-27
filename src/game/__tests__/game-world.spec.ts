@@ -19,7 +19,7 @@ afterEach(() => {
 // Advance the world by one frame (`dt` seconds) and wait for the off-thread work it kicked off to land.
 //
 // The systems run on real Web Workers (via @vitest/web-worker), so `world.update()` only *posts* work - the
-// spawns, collisions, deaths and money transfers all resolve later when each worker replies.  world.update
+// spawns, collisions, deaths and kill rewards all resolve later when each worker replies.  world.update
 // emits `system-<name>-finished` synchronously with whether that system ran this frame, and every system that
 // ran later emits `system-<name>-worker-events-finished` once its reply has been fully applied.  We count the
 // former and wait for that many of the latter, which mirrors exactly how the game ticks - we just block until
@@ -88,7 +88,7 @@ describe('GameWorld game loop', () => {
 			// A single station: with no enemy colour anywhere, its ships never chase a target, so they simply
 			// drift on their spawn velocity and can only ever bounce off the walls.
 			entities: [
-				{ type: 'station', color: RED, money: 20, x: 200, y: 200 },
+				{ type: 'station', color: RED, openShips: 20, x: 200, y: 200 },
 			],
 		});
 		await world.init();
@@ -99,8 +99,8 @@ describe('GameWorld game loop', () => {
 			await runFrame(world, dt);
 		}
 
-		// The station banked 20 money and spends one per frame, so all 20 ships spawned; a single-colour map has
-		// no collisions, so none of them died.
+		// The station banked 20 openShips and spends one per frame, so all 20 ships spawned; a single-colour map
+		// has no collisions, so none of them died (and none returned its slot).
 		const ships = world.entities.filter(entity => !!entity.components.controlled);
 		expect(ships.length).toBe(20);
 
@@ -116,8 +116,8 @@ describe('GameWorld game loop', () => {
 		world.load({
 			bounds: { width: 400, height: 400 },
 			entities: [
-				{ type: 'station', color: RED, money: 0, x: 20, y: 20 },
-				{ type: 'station', color: BLUE, money: 0, x: 380, y: 380 },
+				{ type: 'station', color: RED, openShips: 0, x: 20, y: 20 },
+				{ type: 'station', color: BLUE, openShips: 0, x: 380, y: 380 },
 			],
 		});
 		await world.init();
@@ -142,9 +142,13 @@ describe('GameWorld game loop', () => {
 
 		expect(world.getEntityByEid(redEid)).toBeUndefined();
 		expect(world.getEntityByEid(blueEid)).toBeUndefined();
-		// Each ship landed a killing blow on the other, so each station banked a single-ship bounty.
+		// Each ship landed a killing blow on the other, so each station earned a single-ship kill reward.
 		expect(redStation.components.controller!.money).toBe(1);
 		expect(blueStation.components.controller!.money).toBe(1);
+		// A dead ship returns its slot to its OWN owner (money is never transferred between factions), so each
+		// station gets one openShip back to rebuild with.
+		expect(redStation.components.controller!.openShips).toBe(1);
+		expect(blueStation.components.controller!.openShips).toBe(1);
 	}, 20000);
 
 	it('pays only the winning station when a stronger ship outlasts a weaker enemy', async () => {
@@ -152,8 +156,8 @@ describe('GameWorld game loop', () => {
 		world.load({
 			bounds: { width: 400, height: 400 },
 			entities: [
-				{ type: 'station', color: RED, money: 0, x: 20, y: 20 },
-				{ type: 'station', color: BLUE, money: 0, x: 380, y: 380 },
+				{ type: 'station', color: RED, openShips: 0, x: 20, y: 20 },
+				{ type: 'station', color: BLUE, openShips: 0, x: 380, y: 380 },
 			],
 		});
 		await world.init();
@@ -175,9 +179,12 @@ describe('GameWorld game loop', () => {
 		const survivor = world.getEntityByEid(redEid);
 		expect(world.getEntityByEid(blueEid)).toBeUndefined();
 		expect(survivor).toBeDefined();
-		// The winner's station collected the bounty for the kill; the loser's station got nothing.
+		// The winner's station earned the kill reward; the loser's station got nothing.
 		expect(redStation.components.controller!.money).toBe(1);
 		expect(blueStation.components.controller!.money).toBe(0);
+		// Only the destroyed (blue) ship returned its slot, and it went to its own owner - not the winner.
+		expect(blueStation.components.controller!.openShips).toBe(1);
+		expect(redStation.components.controller!.openShips).toBe(0);
 		// Red traded two of its three shields (one per exchange) to land the kill.
 		expect(survivor!.components.health!.shields).toBe(1);
 	}, 20000);

@@ -23,10 +23,10 @@ test('the game loads without any errors', async ({ page }) => {
 	// SharedArrayBuffer-backed workers only run when the page is cross-origin isolated.
 	expect(await page.evaluate(() => window.crossOriginIsolated)).toBe(true);
 
-	// Wait for the stats panel to report live entities, proving the world actually spun up and
-	// ran at least one simulation tick rather than just mounting an empty scene.
-	await expect(page.getByText(/\d+ stations and \d+ ships/)).toBeVisible();
-	await expect(page.getByText(/[1-9]\d* stations and [1-9]\d* ships/)).toBeVisible();
+	// The debug panel's mainThread time starts at 0.00 on mount and only becomes non-zero after the world has
+	// actually run simulation ticks, so waiting for it proves the game loop is live - not just mounted. (The
+	// live entity counts moved into the Phaser canvas, which getByText can't read.)
+	await expect(page.getByText(/mainThread: (?!0\.00 )\d+\.\d+ \(/)).toBeVisible({ timeout: 15000 });
 
 	expect(pageErrors, `Unexpected page errors:\n${pageErrors.join('\n')}`).toEqual([]);
 	expect(consoleErrors, `Unexpected console errors:\n${consoleErrors.join('\n')}`).toEqual([]);

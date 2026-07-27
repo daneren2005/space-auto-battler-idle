@@ -8,7 +8,7 @@ import distance from '@/math/distance';
 import { POSITION_X, POSITION_Y, POSITION_WIDTH, POSITION_HEIGHT, POSITION_ANGLE } from '../components/position';
 import { VELOCITY_X, VELOCITY_Y } from '../components/velocity';
 import { HEALTH_SHIELDS, HEALTH_TIME_SINCE_DAMAGE, HEALTH_DAMAGE_COOLDOWN } from '../components/health';
-import { CONTROLLER_COLOR, CONTROLLER_MONEY } from '../components/controller';
+import { CONTROLLER_COLOR, CONTROLLER_OPEN_SHIPS, CONTROLLER_MONEY } from '../components/controller';
 import { CONTROLLED_OWNER } from '../components/controlled';
 
 interface SpatialDatum {
@@ -37,9 +37,10 @@ type Scratch = ComponentSystemWorld & {
 
 // Resolves ship-vs-enemy collisions.  For each ship it looks up overlapping entities in the per-run spatial
 // index, and on a real overlap with an enemy (different colour) both sides take a point of shield damage,
-// the killer's owner is paid the bounty, dead entities (and a dead station's whole fleet) are removed, and the
-// ship bounces away.  The `collidable` query supplies every ship + station so cross-entity effects can reach
-// any of them by eid.
+// the killer's faction earns the `money` kill reward, a dead ship's slot returns to its own owner's
+// `openShips` bank so that faction can rebuild, dead entities (and a dead station's whole fleet) are removed,
+// and the ship bounces away.  The `collidable` query supplies every ship + station so cross-entity effects
+// can reach any of them by eid.
 export const collisionUpdate: EntityUpdateFunction<Components, Pick<ComponentArrays, 'velocity'>> = (world, entityId, components, queries, callbacks) => {
 	const scratch = world as Scratch;
 	const velocity = components.velocity;
@@ -156,25 +157,27 @@ function collide(scratch: Scratch, callbacks: ComponentSystemCallbacks<Component
 		return;
 	}
 
-	// A station is worth its whole fleet; a ship is worth one.
-	let enemyWorth = 1;
+	// `self` is always a ship (the collision query requires `controlled`) so it is worth one; a station is
+	// worth its whole fleet as a kill reward, a ship is worth one.
+	let targetWorth = 1;
 	if(target.controller) {
-		enemyWorth = scratch.shipsByStation?.[targetEid]?.length ?? 0;
+		targetWorth = scratch.shipsByStation?.[targetEid]?.length ?? 0;
 	}
 
 	takeDamage(scratch, callbacks, eid, 1);
 	takeDamage(scratch, callbacks, targetEid, 1);
 
 	if(isDead(target)) {
-		payStation(scratch, self.controlled?.[CONTROLLED_OWNER], enemyWorth);
+		// self (a ship) got the kill, so its faction earns the reward...
+		creditMoney(scratch, self.controlled?.[CONTROLLED_OWNER], targetWorth);
+		// ...and if the target was a ship, its slot returns to its own owner so that faction can rebuild.
+		refundSlot(scratch, target);
 	}
 	if(isDead(self)) {
-		if(target.controlled) {
-			payStation(scratch, target.controlled[CONTROLLED_OWNER], 1);
-		} else if(target.controller) {
-			// spawnShipUpdate spends this same station's money on another thread, so pay atomically.
-			Atomics.add(target.controller, CONTROLLER_MONEY, 1);
-		}
+		// whatever killed self earns the reward for the ship (worth one)...
+		creditMoney(scratch, ownerOf(target, targetEid), 1);
+		// ...and self's slot returns to its own owner.
+		refundSlot(scratch, self);
 	}
 }
 
@@ -212,15 +215,40 @@ function kill(callbacks: ComponentSystemCallbacks<Components>, eid: number, bloc
 	killEntityWorker(eid, { entity: blocks.entity }, callbacks);
 }
 
-function payStation(scratch: Scratch, stationEid: number | undefined, amount: number) {
+// The faction (station eid) an entity belongs to: a station is its own faction, a ship's is its owner.
+function ownerOf(blocks: Blocks, eid: number): number | undefined {
+	if(blocks.controller) {
+		return eid;
+	}
+	if(blocks.controlled) {
+		return blocks.controlled[CONTROLLED_OWNER];
+	}
+	return undefined;
+}
+
+// Credit a faction's kill-reward `money`.  Only the player ever spends it, but it is tracked for everyone.
+function creditMoney(scratch: Scratch, stationEid: number | undefined, amount: number) {
 	if(stationEid === undefined) {
 		return;
 	}
 
 	const station = scratch.blocksByEid![stationEid];
 	if(station?.controller) {
-		// Other ships in this same run and spawnShipUpdate on another thread touch this money too.
+		// Other ships in this same run touch this money on other threads too, so add atomically.
 		Atomics.add(station.controller, CONTROLLER_MONEY, amount);
+	}
+}
+
+// A dead ship returns its slot to its owner's `openShips` bank so that faction can spawn a replacement.
+function refundSlot(scratch: Scratch, blocks: Blocks) {
+	if(!blocks.controlled) {
+		return;
+	}
+
+	const station = scratch.blocksByEid![blocks.controlled[CONTROLLED_OWNER]];
+	if(station?.controller) {
+		// spawnShipUpdate spends this same bank on another thread, so refund atomically.
+		Atomics.add(station.controller, CONTROLLER_OPEN_SHIPS, 1);
 	}
 }
 

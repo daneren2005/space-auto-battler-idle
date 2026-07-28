@@ -5,6 +5,7 @@ import { getLevelIndex } from '@/data/levels';
 import type { Carry } from '@/data/progress';
 import { saveProgress, resetProgress } from '@/data/progress';
 import { CONTROLLER_MONEY, CONTROLLER_OPEN_SHIPS, CONTROLLER_SHIP_SHIELDS } from './components/controller';
+import { playAreaViewport } from './display';
 import type GameWorld from './entities/game-world';
 
 // A single station's ship tally, used to render the per-team breakdown in the debug panel.
@@ -23,7 +24,7 @@ export interface SystemStat {
 }
 
 // A full snapshot of everything the debug panel displays.  The scene owns the game loop and worker timing, so
-// it is the single source of truth for these numbers; the Vue component is purely presentational.
+// it is the single source of truth for these numbers; the UI scene is purely presentational.
 export interface GameStats {
 	maxUpdateTime: number
 	avgUpdateTime: number
@@ -43,9 +44,20 @@ export interface GameSceneOptions {
 	level: LevelConfig
 	// Upgrades / money carried over from earlier levels, applied to the player's station on load.
 	carry: Carry
-	// Called roughly once per second with a fresh snapshot of the game's debug stats.
-	onStats: (stats: GameStats) => void
 }
+
+// An empty snapshot so the `stats` getter always returns a well-formed object, even before the first
+// reporting window has elapsed.
+const EMPTY_STATS: GameStats = {
+	maxUpdateTime: 0,
+	avgUpdateTime: 0,
+	memory: '',
+	stationsCount: 0,
+	shipsCount: 0,
+	totalCount: 0,
+	stationShips: [],
+	systemUpdates: [],
+};
 
 // The Phaser scene that plays the shared-memory-ecs game: it loads the level, kicks off the world, and every
 // frame runs the simulation and syncs a sprite (+ shield) for each live entity.  It also owns the "game" side
@@ -56,7 +68,10 @@ export default class GameScene extends Phaser.Scene {
 	private world: GameWorld;
 	private level: LevelConfig;
 	private carry: Carry;
-	private onStats: (stats: GameStats) => void;
+
+	// The most recent debug-stats snapshot, refreshed ~once a second.  The UIScene reads this to render the
+	// in-game debug overlay (toggled with the backtick key).
+	private latestStats: GameStats = EMPTY_STATS;
 
 	private paused = false;
 	private eidSpriteMap = new Map<number, any>();
@@ -79,7 +94,6 @@ export default class GameScene extends Phaser.Scene {
 		this.world = options.world;
 		this.level = options.level;
 		this.carry = options.carry;
-		this.onStats = options.onStats;
 	}
 
 	preload() {
@@ -91,12 +105,16 @@ export default class GameScene extends Phaser.Scene {
 	create() {
 		this.world.load({ entities: this.level.entities, bounds: this.level.bounds });
 
-		// The canvas is a fixed size (DISPLAY_*); zoom the game camera so this level's world bounds fill it and
-		// centre it on the world.  A small level zooms in, a large one zooms out - either way the UIScene, which
-		// has its own camera, is untouched, so the HUD/menus never change size with the level.
+		// The canvas is a fixed size (DISPLAY_*), and the battle only gets the strip between the HUD's top text
+		// and its bottom buttons - so point the game camera at exactly that strip and zoom so this level's world
+		// bounds fill it, centred on the world.  A small level zooms in, a large one zooms out - either way the
+		// UIScene, which has its own full-canvas camera, is untouched, so the HUD/menus never change size with
+		// the level, and no station can be drawn underneath them.
 		const { width, height } = this.scale;
+		const viewport = playAreaViewport(width, height);
 		const bounds = this.level.bounds;
-		const zoom = Math.min(width / bounds.width, height / bounds.height);
+		const zoom = Math.min(viewport.width / bounds.width, viewport.height / bounds.height);
+		this.cameras.main.setViewport(viewport.x, viewport.y, viewport.width, viewport.height);
 		this.cameras.main.setZoom(zoom);
 		this.cameras.main.centerOn(bounds.width / 2, bounds.height / 2);
 
@@ -182,14 +200,19 @@ export default class GameScene extends Phaser.Scene {
 				sprite = this.add.image(0, 0, entity.components.controller ? 'station' : 'boid');
 				sprite.setScale(position.width / sprite.width, position.height / sprite.height);
 				sprite.shieldImage = this.add.image(0, 0, 'shield');
-				sprite.shieldImage.setScale(position.width / sprite.shieldImage.width * 2, position.height / sprite.shieldImage.height * 2);
+				// The shield art points up (front-to-back runs along its Y axis) whereas the entity's `width` is its
+				// front-to-back length, so map width -> shield Y and height -> shield X to keep it skinny like the ship.
+				sprite.shieldImage.setScale(position.height / sprite.shieldImage.width * 2, position.width / sprite.shieldImage.height * 2);
 				sprite.setTint(this.getTint(entity.eid));
 				this.eidSpriteMap.set(entity.eid, sprite);
 			}
 
 			sprite.x = sprite.shieldImage.x = position.x;
 			sprite.y = sprite.shieldImage.y = position.y;
-			sprite.angle = sprite.shieldImage.angle = position.angle;
+			sprite.angle = position.angle;
+			// The shield art has its front edge at the top, but position.angle follows Phaser's convention
+			// where 0deg points right; offset by 90deg so the shield's front lines up with the heading.
+			sprite.shieldImage.angle = position.angle + 90;
 			sprite.shieldImage.visible = (entity.components.health?.shields ?? 0) > 0;
 		});
 
@@ -214,8 +237,18 @@ export default class GameScene extends Phaser.Scene {
 		return this.state;
 	}
 
+	// The latest debug-stats snapshot, rendered by the UIScene's in-game overlay.
+	get stats(): GameStats {
+		return this.latestStats;
+	}
+
 	get levelTitle(): string {
 		return this.level.title;
+	}
+
+	// The level's 1-based position in the play order, for the HUD's "Level N" label.
+	get levelNumber(): number {
+		return getLevelIndex(this.level.name) + 1;
 	}
 
 	// The player faction's kill-reward money.  A plain read is fine for display; workers only ever add to it.
@@ -386,7 +419,7 @@ export default class GameScene extends Phaser.Scene {
 			return stats;
 		});
 
-		this.onStats({
+		this.latestStats = {
 			maxUpdateTime: this.maxUpdateTime,
 			avgUpdateTime: this.avgUpdateTime,
 			memory: prettyMemory(this.world.heap),
@@ -396,6 +429,6 @@ export default class GameScene extends Phaser.Scene {
 			// Copy so the consumer can't mutate the scene's internal array.
 			stationShips: this.stationShips.map(stat => ({ ...stat })),
 			systemUpdates,
-		});
+		};
 	}
 }

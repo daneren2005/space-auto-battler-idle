@@ -4,7 +4,6 @@
 		"module": "esnext",
 		"moduleResolution": "bundler",
 		"strict": true,
-		"jsx": "preserve",
 		"esModuleInterop": true,
 		"allowSyntheticDefaultImports": true,
 		"forceConsistentCasingInFileNames": true,
@@ -28,8 +27,6 @@
 	},
 	"include": [
 		"src/**/*.ts",
-		"src/**/*.tsx",
-		"src/**/*.vue",
 		"*.config.ts"
 	],
 	"exclude": [

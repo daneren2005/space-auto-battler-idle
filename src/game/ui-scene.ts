@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import type GameScene from './game-scene';
 import type { GameState } from './game-scene';
+import formatStats from './format-stats';
+import { HUD_TOP_HEIGHT, HUD_BOTTOM_HEIGHT } from './display';
 
 // Key for the bitmap font (public/ui/orbitron.png + orbitron.fnt, exported from snowb.org).  All HUD / menu
 // text is drawn with it so the UI has a consistent sci-fi typeface, coloured per-use with FILL-mode tint
@@ -8,6 +10,13 @@ import type { GameState } from './game-scene';
 // with a few px of glyph spacing - baking large (200px) + tight packing makes the small labels downscale into a
 // grey haze between the letters.
 const FONT = 'orbitron';
+
+// The two upgrade buttons sit side by side, centred in the bottom HUD band.  BUTTON_OFFSET is how far each
+// one's centre sits from the middle of the canvas, so the pair stays centred whatever the canvas width is.
+const BUTTON_WIDTH = 280;
+const BUTTON_HEIGHT = 64;
+const BUTTON_GAP = 24;
+const BUTTON_OFFSET = (BUTTON_WIDTH + BUTTON_GAP) / 2;
 
 // The sci-fi HUD + menus, drawn as a second scene running on top of the game so it never gets cleared by the
 // simulation.  It is purely presentational: every frame it reads the GameScene's public getters (player money,
@@ -17,6 +26,7 @@ const FONT = 'orbitron';
 export default class UIScene extends Phaser.Scene {
 	private gameScene!: GameScene;
 
+	private levelText!: Phaser.GameObjects.BitmapText;
 	private moneyText!: Phaser.GameObjects.BitmapText;
 	private fleetText!: Phaser.GameObjects.BitmapText;
 
@@ -31,6 +41,11 @@ export default class UIScene extends Phaser.Scene {
 	private dialogMessage!: Phaser.GameObjects.BitmapText;
 	private dialogButtonLabel!: Phaser.GameObjects.BitmapText;
 	private dialogShownFor: GameState = 'playing';
+
+	// Developer stats overlay, hidden until the player toggles it with the backtick (`) key.
+	private statsPanel!: Phaser.GameObjects.Container;
+	private statsText!: Phaser.GameObjects.BitmapText;
+	private statsVisible = false;
 
 	constructor() {
 		super('ui');
@@ -48,41 +63,49 @@ export default class UIScene extends Phaser.Scene {
 		this.gameScene = this.scene.get('game') as GameScene;
 		const { width, height } = this.scale;
 
-		// --- Top-left HUD: player kill-reward money + fleet size ---
+		// --- Top HUD band: level title, then player kill-reward money + fleet size on a second row ---
 		// Bitmap glyphs are tinted with FILL mode: the tint colour replaces the glyph's RGB and only its alpha is
 		// used for shape, so the text colours correctly no matter what colour the exported atlas glyphs are.
-		this.moneyText = this.add.bitmapText(24, 20, FONT, '', 28).setTintFill(0xffd54a);
-		this.fleetText = this.add.bitmapText(24, 58, FONT, '', 18).setTintFill(0x8fd6ff);
+		// The canvas is narrow (portrait), so the rows stack rather than running along a single line: the level
+		// title is centred on top, with money hugging the left edge and the fleet summary the right below it.
+		this.levelText = this.add.bitmapText(width / 2, 30, FONT, '', 22)
+			.setOrigin(0.5).setCenterAlign().setTintFill(0xcfe6ff);
+		this.moneyText = this.add.bitmapText(24, 74, FONT, '', 28).setOrigin(0, 0.5).setTintFill(0xffd54a);
+		this.fleetText = this.add.bitmapText(width - 24, 74, FONT, '', 18).setOrigin(1, 0.5).setTintFill(0x8fd6ff);
 
-		// --- Bottom-left: the two upgrade buttons (ship slot + shields), laid out side by side ---
-		this.upgradeButton = this.add.image(150, height - 46, 'ui-button')
-			.setDisplaySize(240, 52)
+		// --- Bottom HUD band: the two upgrade buttons (ship slot + shields), centred side by side.  They are
+		// sized for thumbs rather than a mouse pointer, since the portrait canvas is aimed at phones. ---
+		const buttonY = height - HUD_BOTTOM_HEIGHT / 2;
+		this.upgradeButton = this.add.image(width / 2 - BUTTON_OFFSET, buttonY, 'ui-button')
+			.setDisplaySize(BUTTON_WIDTH, BUTTON_HEIGHT)
 			.setInteractive({ useHandCursor: true });
-		this.upgradeLabel = this.add.bitmapText(150, height - 46, FONT, '', 16)
+		this.upgradeLabel = this.add.bitmapText(width / 2 - BUTTON_OFFSET, buttonY, FONT, '', 16)
 			.setOrigin(0.5).setCenterAlign().setTintFill(0xffffff);
 		this.upgradeButton.on('pointerdown', () => {
 			this.gameScene.buyUpgrade();
 		});
 
-		this.shieldButton = this.add.image(410, height - 46, 'ui-button')
-			.setDisplaySize(240, 52)
+		this.shieldButton = this.add.image(width / 2 + BUTTON_OFFSET, buttonY, 'ui-button')
+			.setDisplaySize(BUTTON_WIDTH, BUTTON_HEIGHT)
 			.setInteractive({ useHandCursor: true });
-		this.shieldLabel = this.add.bitmapText(410, height - 46, FONT, '', 16)
+		this.shieldLabel = this.add.bitmapText(width / 2 + BUTTON_OFFSET, buttonY, FONT, '', 16)
 			.setOrigin(0.5).setCenterAlign().setTintFill(0xffffff);
 		this.shieldButton.on('pointerdown', () => {
 			this.gameScene.buyShieldUpgrade();
 		});
 
 		this.buildDialog(width, height);
+		this.buildStatsPanel(width);
 	}
 
 	update() {
+		this.levelText.setText(`Level ${this.gameScene.levelNumber}: ${this.gameScene.levelTitle}`);
 		this.moneyText.setText(`$${this.gameScene.playerMoney}`);
 		this.fleetText.setText(`Fleet: ${this.gameScene.playerTotalFleet}   Shields: ${this.gameScene.playerShipShields}`);
 
 		const shipCost = this.gameScene.upgradeCost;
 		const shipAffordable = this.gameScene.canAffordUpgrade;
-		this.upgradeLabel.setText(`+1 Ship Slot\n$${shipCost}`);
+		this.upgradeLabel.setText(`+1 Ship\n$${shipCost}`);
 		this.upgradeButton.setAlpha(shipAffordable ? 1 : 0.45);
 		this.upgradeButton.setTint(shipAffordable ? 0xffffff : 0x8899aa);
 
@@ -96,6 +119,32 @@ export default class UIScene extends Phaser.Scene {
 		if(state !== 'playing' && this.dialogShownFor !== state) {
 			this.showDialog(state);
 		}
+
+		// Only spend the string-building work when the overlay is actually on screen.
+		if(this.statsVisible) {
+			this.statsText.setText(formatStats(this.gameScene.stats));
+		}
+	}
+
+	// A developer stats overlay pinned to the right, just under the top HUD band so it never covers the level /
+	// money text.  Hidden until toggled with the backtick key.  It mirrors the engine timing / memory / entity
+	// snapshot the GameScene collects each second.
+	private buildStatsPanel(width: number) {
+		const margin = 12;
+		const background = this.add.rectangle(0, 0, 360, 240, 0x03060f, 0.72)
+			.setOrigin(1, 0)
+			.setStrokeStyle(1, 0x1d3b5c);
+		this.statsText = this.add.bitmapText(-16, 14, FONT, '', 15)
+			.setOrigin(1, 0).setRightAlign().setTintFill(0x8fd6ff);
+
+		this.statsPanel = this.add.container(width - margin, HUD_TOP_HEIGHT + margin, [background, this.statsText])
+			.setDepth(200)
+			.setVisible(false);
+
+		this.input.keyboard?.on('keydown-BACKTICK', () => {
+			this.statsVisible = !this.statsVisible;
+			this.statsPanel.setVisible(this.statsVisible);
+		});
 	}
 
 	private buildDialog(width: number, height: number) {
@@ -103,7 +152,7 @@ export default class UIScene extends Phaser.Scene {
 
 		const panel = this.add.image(0, 0, 'ui-window').setDisplaySize(520, 380);
 
-		this.dialogTitle = this.add.bitmapText(0, -96, FONT, '', 40).setOrigin(0.5).setCenterAlign();
+		this.dialogTitle = this.add.bitmapText(0, -134, FONT, '', 40).setOrigin(0.5).setCenterAlign();
 
 		this.dialogMessage = this.add.bitmapText(0, -20, FONT, '', 18)
 			.setOrigin(0.5).setCenterAlign().setMaxWidth(380).setTintFill(0xcfe6ff);

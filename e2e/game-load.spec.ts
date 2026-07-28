@@ -23,10 +23,14 @@ test('the game loads without any errors', async ({ page }) => {
 	// SharedArrayBuffer-backed workers only run when the page is cross-origin isolated.
 	expect(await page.evaluate(() => window.crossOriginIsolated)).toBe(true);
 
-	// The debug panel's mainThread time starts at 0.00 on mount and only becomes non-zero after the world has
-	// actually run simulation ticks, so waiting for it proves the game loop is live - not just mounted. (The
-	// live entity counts moved into the Phaser canvas, which getByText can't read.)
-	await expect(page.getByText(/mainThread: (?!0\.00 )\d+\.\d+ \(/)).toBeVisible({ timeout: 15000 });
+	// The stats now render into the Phaser canvas (which the DOM can't read), so read them straight off the live
+	// GameScene instead.  maxUpdateTime starts at 0 and only becomes non-zero after the world has run real
+	// simulation ticks (its first ~1s reporting window), so waiting for it proves the game loop is live - not
+	// just mounted.  main.ts hangs the running game off window.__game for exactly this purpose.
+	await page.waitForFunction(() => {
+		const scene = window.__game?.scene.getScene('game') as { stats?: { maxUpdateTime: number } } | null;
+		return typeof scene?.stats?.maxUpdateTime === 'number' && scene.stats.maxUpdateTime > 0;
+	}, undefined, { timeout: 15000 });
 
 	expect(pageErrors, `Unexpected page errors:\n${pageErrors.join('\n')}`).toEqual([]);
 	expect(consoleErrors, `Unexpected console errors:\n${consoleErrors.join('\n')}`).toEqual([]);

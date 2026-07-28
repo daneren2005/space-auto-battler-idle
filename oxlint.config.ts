@@ -8,7 +8,6 @@ export default defineConfig({
 		'import',
 		'promise',
 		'vitest',
-		'vue',
 	],
 	jsPlugins: [
 		// NOTE: This adds 2-3 seconds so would be good to see if we can switch to oxfmt and remove the need for eslint-plugin-stylistic

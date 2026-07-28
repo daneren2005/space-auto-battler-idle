@@ -59,21 +59,29 @@ describe('levels', () => {
 		});
 	});
 
-	it('places the two stations vertically centred on opposite horizontal sides', () => {
+	it('uses a portrait playing field so it fits the tall mobile canvas', () => {
+		levels.forEach(level => {
+			expect(level.bounds.height).toBeGreaterThan(level.bounds.width);
+		});
+	});
+
+	it('places the player at the bottom and the enemy at the top, both horizontally centred', () => {
 		levels.forEach(level => {
 			const stations = level.entities.filter(entity => entity.type === 'station');
 			expect(stations).toHaveLength(2);
 
-			const midY = level.bounds.height / 2;
+			const midX = level.bounds.width / 2;
 			stations.forEach(station => {
-				// Both factions sit on the vertical centre line so their fleets meet in the middle.
-				expect(station.y).toBe(midY);
+				// Both factions sit on the horizontal centre line so their fleets meet in the middle.
+				expect(station.x).toBe(midX);
 			});
 
-			// One faction on the left half, the other on the right.
-			const midX = level.bounds.width / 2;
-			expect(stations.filter(station => station.x! < midX)).toHaveLength(1);
-			expect(stations.filter(station => station.x! > midX)).toHaveLength(1);
+			// The player holds the bottom edge (nearest the upgrade buttons); the enemy holds the top.
+			const midY = level.bounds.height / 2;
+			const player = stations.find(station => station.player);
+			const enemy = stations.find(station => !station.player);
+			expect(player?.y).toBeGreaterThan(midY);
+			expect(enemy?.y).toBeLessThan(midY);
 		});
 	});
 });

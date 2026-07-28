@@ -3,12 +3,31 @@
 	<head>
 		<meta charset="utf-8">
 		<meta http-equiv="X-UA-Compatible" content="IE=edge">
-		<meta name="viewport" content="width=device-width,initial-scale=1.0">
+		<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
 		<link rel="icon" href="/favicon.ico">
 		<title>Space Auto Battler Idle</title>
+		<style>
+			/* The canvas is portrait, so hand it the whole viewport: on a phone it fills the screen, and on a
+			   desktop Scale.FIT letterboxes it to a tall strip in the middle. */
+			body {
+				margin: 0;
+				background: #05070f;
+				/* Stop mobile browsers rubber-banding the page around a canvas that already fills the screen. */
+				overflow: hidden;
+			}
+
+			/* Give Phaser's parent a determinate size.  With Scale.FIT and an auto-sized parent the canvas and its
+			   container feed back into each other and the canvas grows every resize; a fixed box breaks that loop.
+			   dvh tracks the visible area as mobile browser chrome slides in and out; vh is the fallback. */
+			#phaser-container {
+				width: 100vw;
+				height: 100vh;
+				height: 100dvh;
+			}
+		</style>
 	</head>
 	<body>
-		<div id="app"></div>
+		<div id="phaser-container"></div>
 		<script type="module" src="/src/main.ts"></script>
 	</body>
 </html>

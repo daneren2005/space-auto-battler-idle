@@ -1,15 +1,4 @@
-const colors = [
-	0xd50000,
-	0x2962ff,
-	0xffffff,
-	0xff6d00,
-	0x76ff03,
-	0xaa00ff,
-	0x77e8de,
-	0xf3e28d,
-	0xde62ab,
-	0x39ab62,
-];
+import { factionColor } from './colors';
 
 export default function generateScene(options: OptionsConfig) {
 	let entities: Array<any> = [];
@@ -21,7 +10,7 @@ export default function generateScene(options: OptionsConfig) {
 			x,
 			y,
 			type: 'station',
-			color: colors[i] ?? Math.floor(Math.random() * 16777215),
+			color: factionColor(i),
 			openShips: options.shipsPerStation ?? 10,
 		});
 	}

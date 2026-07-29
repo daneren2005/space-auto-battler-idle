@@ -8,6 +8,9 @@ const BLUE = 0x0000ff;
 
 // spawnShipUpdate caps a fresh ship's per-axis velocity at this magnitude (px/second).
 const SHIP_SPEED = 100;
+// shipConfig's steerForce, and the fraction of it a ship may roll on top as it spawns.
+const SHIP_STEER_FORCE = 10;
+const SHIP_STEER_FORCE_BONUS = 0.5;
 
 let world: GameWorld | undefined;
 afterEach(() => {
@@ -110,6 +113,37 @@ describe('GameWorld game loop', () => {
 		const tolerance = SHIP_SPEED * dt + 1;
 		expect(everyEntityWithinBounds(world, tolerance)).toBe(true);
 	}, 60000);
+
+	it('rolls every ship its own steer force so no two turn at the same radius', async () => {
+		world = new GameWorld();
+		world.load({
+			bounds: { width: 400, height: 400 },
+			entities: [
+				{ type: 'station', color: RED, openShips: 20, x: 200, y: 200 },
+			],
+		});
+		await world.init();
+
+		// One ship spawns per station per frame, so this banks the whole fleet with frames to spare.
+		for(let i = 0; i < 25; i++) {
+			await runFrame(world, 0.1);
+		}
+
+		// Only ships attack, so only ships carry the component the steer force lives on.
+		const steerForces = world.entities.filter(entity => !!entity.components.attack).map(entity => entity.components.attack!.steerForce);
+		expect(steerForces.length).toBe(20);
+
+		// Every roll lands inside the band the template asked for.  Crucially the floor is the template's own
+		// steerForce: rolling below it would widen that ship's turn circle and make it worse at closing, which
+		// is the opposite of what the roll is for.  The value is a Float32, hence the slack on the bounds.
+		for(let steerForce of steerForces) {
+			expect(steerForce).toBeGreaterThan(SHIP_STEER_FORCE - 0.001);
+			expect(steerForce).toBeLessThan(SHIP_STEER_FORCE * (1 + SHIP_STEER_FORCE_BONUS) + 0.001);
+		}
+		// The point of the variance: ships that all turn at exactly the same radius can settle into circling
+		// each other instead of closing, so no two of them may share one.
+		expect(new Set(steerForces).size).toBe(steerForces.length);
+	}, 20000);
 
 	it('destroys both ships and pays each owning station when evenly matched enemies collide', async () => {
 		world = new GameWorld();

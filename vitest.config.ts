@@ -11,6 +11,11 @@ export default defineConfig({
 		globals: true,
 		environment: 'node',
 		include: ['src/**/*.spec.ts'],
-		setupFiles: ['@vitest/web-worker'],
+		// Deliberately no `setupFiles: ['@vitest/web-worker']`.  With no `Worker` global, shared-memory-ecs runs
+		// every ComponentSystem's update function in-process instead of posting it to a worker, so `world.update()`
+		// resolves a whole frame synchronously and the game-loop tests stay deterministic.  Emulated workers made
+		// world creation depend on the module runner re-importing each `*.worker.ts` per instance, which hung
+		// (forever, until the test timeout) for every world after the first one on CI.  The real worker path is
+		// covered by the Playwright E2E tests, which run the built app in a browser.
 	},
 });

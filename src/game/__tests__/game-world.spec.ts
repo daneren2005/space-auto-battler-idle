@@ -14,61 +14,18 @@ const SHIP_STEER_FORCE_BONUS = 0.5;
 
 let world: GameWorld | undefined;
 afterEach(() => {
-	// Tear the world down so its Web Workers are terminated between tests.
+	// Release the world's systems (and the heap they were handed) between tests.
 	world?.destroy();
 	world = undefined;
 });
 
-// Advance the world by one frame (`dt` seconds) and wait for the off-thread work it kicked off to land.
+// These tests step the world a frame at a time with `world.update(dt)` and assert straight afterwards.
 //
-// The systems run on real Web Workers (via @vitest/web-worker), so `world.update()` only *posts* work - the
-// spawns, collisions, deaths and kill rewards all resolve later when each worker replies.  world.update
-// emits `system-<name>-finished` synchronously with whether that system ran this frame, and every system that
-// ran later emits `system-<name>-worker-events-finished` once its reply has been fully applied.  We count the
-// former and wait for that many of the latter, which mirrors exactly how the game ticks - we just block until
-// the frame has fully settled before asserting or stepping again.
-function runFrame(gameWorld: GameWorld, dt: number): Promise<void> {
-	let expected = 0;
-	let completed = 0;
-	let settle: (() => void) | undefined;
-	const settled = new Promise<void>(resolve => {
-		settle = resolve;
-	});
-
-	const workerHandlers = gameWorld.systems.map(system => {
-		const event = `system-${system.name}-worker-events-finished`;
-		const handler = () => {
-			completed++;
-			if(completed >= expected) {
-				settle?.();
-			}
-		};
-		gameWorld.on(event, handler);
-		return { event, handler };
-	});
-	const ranHandlers = gameWorld.systems.map(system => {
-		const event = `system-${system.name}-finished`;
-		const handler = (result: { ran: boolean }) => {
-			if(result.ran) {
-				expected++;
-			}
-		};
-		gameWorld.once(event, handler);
-		return { event, handler };
-	});
-
-	gameWorld.update(dt);
-
-	// Nothing posted any off-thread work this frame, so there is nothing to wait for.
-	if(expected === 0) {
-		settle?.();
-	}
-
-	return settled.finally(() => {
-		workerHandlers.forEach(({ event, handler }) => gameWorld.off(event, handler));
-		ranHandlers.forEach(({ event, handler }) => gameWorld.off(event, handler));
-	});
-}
+// There is no `Worker` global under vitest (see vitest.config.ts), so shared-memory-ecs runs each system's
+// update function in-process: by the time `update` returns, that frame's spawns, collisions, deaths and kill
+// rewards have all been applied.  In the browser the same update functions run on real Web Workers and their
+// results land a frame or more later, so a system there may sit out a frame while its worker is still busy -
+// that spreads the same work over more frames without changing what any of it does.
 
 // Every ship (controlled) and station (controller) stays on screen.
 function everyEntityWithinBounds(gameWorld: GameWorld, tolerance: number): boolean {
@@ -99,7 +56,7 @@ describe('GameWorld game loop', () => {
 		const dt = 0.25;
 		const frames = Math.round(60 / dt);
 		for(let i = 0; i < frames; i++) {
-			await runFrame(world, dt);
+			world.update(dt);
 		}
 
 		// The station banked 20 openShips and spends one per frame, so all 20 ships spawned; a single-colour map
@@ -112,7 +69,7 @@ describe('GameWorld game loop', () => {
 		// separates "bounced" from "escaped".
 		const tolerance = SHIP_SPEED * dt + 1;
 		expect(everyEntityWithinBounds(world, tolerance)).toBe(true);
-	}, 60000);
+	});
 
 	it('rolls every ship its own steer force so no two turn at the same radius', async () => {
 		world = new GameWorld();
@@ -126,7 +83,7 @@ describe('GameWorld game loop', () => {
 
 		// One ship spawns per station per frame, so this banks the whole fleet with frames to spare.
 		for(let i = 0; i < 25; i++) {
-			await runFrame(world, 0.1);
+			world.update(0.1);
 		}
 
 		// Only ships attack, so only ships carry the component the steer force lives on.
@@ -143,7 +100,7 @@ describe('GameWorld game loop', () => {
 		// The point of the variance: ships that all turn at exactly the same radius can settle into circling
 		// each other instead of closing, so no two of them may share one.
 		expect(new Set(steerForces).size).toBe(steerForces.length);
-	}, 20000);
+	});
 
 	it('destroys both ships and pays each owning station when evenly matched enemies collide', async () => {
 		world = new GameWorld();
@@ -171,7 +128,7 @@ describe('GameWorld game loop', () => {
 		// dt sits above the 0.2s damage cooldown so a hit lands on every eligible frame.  Both ships have one
 		// shield, so the first exchange drops them to zero and the second is mutually fatal.
 		for(let i = 0; i < 40 && (world.getEntityByEid(redEid) || world.getEntityByEid(blueEid)); i++) {
-			await runFrame(world, 0.25);
+			world.update(0.25);
 		}
 
 		expect(world.getEntityByEid(redEid)).toBeUndefined();
@@ -183,7 +140,7 @@ describe('GameWorld game loop', () => {
 		// station gets one openShip back to rebuild with.
 		expect(redStation.components.controller!.openShips).toBe(1);
 		expect(blueStation.components.controller!.openShips).toBe(1);
-	}, 20000);
+	});
 
 	it('pays only the winning station when a stronger ship outlasts a weaker enemy', async () => {
 		world = new GameWorld();
@@ -207,7 +164,7 @@ describe('GameWorld game loop', () => {
 		const blueEid = blue.eid;
 
 		for(let i = 0; i < 40 && world.getEntityByEid(blueEid); i++) {
-			await runFrame(world, 0.25);
+			world.update(0.25);
 		}
 
 		const survivor = world.getEntityByEid(redEid);
@@ -221,5 +178,5 @@ describe('GameWorld game loop', () => {
 		expect(redStation.components.controller!.openShips).toBe(0);
 		// Red traded two of its three shields (one per exchange) to land the kill.
 		expect(survivor!.components.health!.shields).toBe(1);
-	}, 20000);
+	});
 });

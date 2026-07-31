@@ -3,14 +3,14 @@ import generateScene from '../generate-scene';
 
 describe('generateScene', () => {
 	it('creates the requested number of stations within the given bounds', () => {
-		let scene = generateScene({ stations: 5, shipsPerStation: 20, width: 800, height: 600 });
+		let scene = generateScene({ stations: 5, shipsPerSecond: 20, width: 800, height: 600 });
 
 		expect(scene.entities).toHaveLength(5);
 		expect(scene.bounds).toEqual({ width: 800, height: 600 });
 
 		scene.entities.forEach(entity => {
 			expect(entity.type).toBe('station');
-			expect(entity.openShips).toBe(20);
+			expect(entity.shipsPerSecond).toBe(20);
 			expect(entity.x).toBeGreaterThanOrEqual(0);
 			expect(entity.x).toBeLessThanOrEqual(800);
 			expect(entity.y).toBeGreaterThanOrEqual(0);

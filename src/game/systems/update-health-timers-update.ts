@@ -7,12 +7,15 @@ import {
 
 // Advances each entity's health timers: the damage-cooldown clock always ticks, and shields regenerate one at
 // a time once enough time has passed since the last regeneration.  Runs directly over the shared-memory block.
-// collisionUpdate mutates the same shields + damage timer on another worker thread at the same time, so the
-// fields it shares are read-modify-written with the Float32 atomic helpers (the block stays a Float32Array).
+// The physics system's collisions mutate the same shields + damage timer on another worker thread at the same
+// time, so the fields it shares are read-modify-written with the Float32 atomic helpers (the block stays a
+// Float32Array).
 export const updateHealthTimersUpdate: EntityUpdateFunction<Components, Pick<ComponentArrays, 'health'>> = (world, entityId, components) => {
 	const health = components.health;
 
-	const elapsedTime = world.elapsedTime;
+	// The world is driven in milliseconds (what shared-memory-physics measures elapsedTime in) while every timer
+	// on this component is configured in seconds, so convert before advancing them.
+	const elapsedTime = world.elapsedTime / 1_000;
 	// collisionUpdate resets this to 0 when it deals damage, so advance it atomically (no upper bound needed).
 	addAtomicFloat32(health, HEALTH_TIME_SINCE_DAMAGE, elapsedTime, Infinity);
 

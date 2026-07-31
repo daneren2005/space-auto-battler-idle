@@ -16,10 +16,26 @@ export default defineConfig(({ mode }) => {
 			alias: {
 				'@': fileURLToPath(new URL('./src', import.meta.url)),
 			},
+			// shared-memory-physics is linked in from a sibling checkout, so it resolves these two peer dependencies
+			// out of its own node_modules unless they are deduped.  Two copies would mean two heaps' worth of module
+			// state for components this game registers against the physics library's definitions.
+			dedupe: [
+				'@daneren2005/shared-memory-ecs',
+				'@daneren2005/shared-memory-objects',
+			],
 		},
 
 		build: {
 			assetsInlineLimit: 0,
+			// Two pages: the game itself, and the engine stress test at /stress-test (its own directory so the URL
+			// has no extension and resolves on a plain static host).  Naming any input here replaces Vite's default
+			// single index.html entry, so the game page has to be listed too.
+			rollupOptions: {
+				input: {
+					main: fileURLToPath(new URL('./index.html', import.meta.url)),
+					stressTest: fileURLToPath(new URL('./stress-test/index.html', import.meta.url)),
+				},
+			},
 		},
 		server: {
 			port: 8080,
@@ -36,6 +52,7 @@ export default defineConfig(({ mode }) => {
 			exclude: [
 				'@daneren2005/shared-memory-objects',
 				'@daneren2005/shared-memory-ecs',
+				'@daneren2005/shared-memory-physics',
 			],
 		},
 	};

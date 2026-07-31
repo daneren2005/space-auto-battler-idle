@@ -73,7 +73,7 @@ export default class UIScene extends Phaser.Scene {
 		this.moneyText = this.add.bitmapText(24, 74, FONT, '', 28).setOrigin(0, 0.5).setTintFill(0xffd54a);
 		this.fleetText = this.add.bitmapText(width - 24, 74, FONT, '', 18).setOrigin(1, 0.5).setTintFill(0x8fd6ff);
 
-		// --- Bottom HUD band: the two upgrade buttons (ship slot + shields), centred side by side.  They are
+		// --- Bottom HUD band: the two upgrade buttons (ship rate + shields), centred side by side.  They are
 		// sized for thumbs rather than a mouse pointer, since the portrait canvas is aimed at phones. ---
 		const buttonY = height - HUD_BOTTOM_HEIGHT / 2;
 		this.upgradeButton = this.add.image(width / 2 - BUTTON_OFFSET, buttonY, 'ui-button')
@@ -99,13 +99,13 @@ export default class UIScene extends Phaser.Scene {
 	}
 
 	update() {
-		this.levelText.setText(`Level ${this.gameScene.levelNumber}: ${this.gameScene.levelTitle}`);
+		this.levelText.setText(this.gameScene.levelLabel);
 		this.moneyText.setText(`$${this.gameScene.playerMoney}`);
-		this.fleetText.setText(`Fleet: ${this.gameScene.playerTotalFleet}   Shields: ${this.gameScene.playerShipShields}`);
+		this.fleetText.setText(`Fleet: +${this.gameScene.playerShipsPerSecond}/s   Shields: ${this.gameScene.playerShipShields}`);
 
 		const shipCost = this.gameScene.upgradeCost;
 		const shipAffordable = this.gameScene.canAffordUpgrade;
-		this.upgradeLabel.setText(`+1 Ship\n$${shipCost}`);
+		this.upgradeLabel.setText(`+1 Ship/sec\n$${shipCost}`);
 		this.upgradeButton.setAlpha(shipAffordable ? 1 : 0.45);
 		this.upgradeButton.setTint(shipAffordable ? 0xffffff : 0x8899aa);
 
@@ -131,7 +131,7 @@ export default class UIScene extends Phaser.Scene {
 	// snapshot the GameScene collects each second.
 	private buildStatsPanel(width: number) {
 		const margin = 12;
-		const background = this.add.rectangle(0, 0, 360, 240, 0x03060f, 0.72)
+		const background = this.add.rectangle(0, 0, 400, 330, 0x03060f, 0.72)
 			.setOrigin(1, 0)
 			.setStrokeStyle(1, 0x1d3b5c);
 		this.statsText = this.add.bitmapText(-16, 14, FONT, '', 15)

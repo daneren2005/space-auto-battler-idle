@@ -1,10 +1,6 @@
-// @ts-expect-error
-import Geom from 'phaser/src/geom';
-// @ts-expect-error
-import PhaserMath from 'phaser/src/math';
-
+// The heading of a velocity vector, in radians counter-clockwise from +x - which is what the physics
+// transform's `angle` is measured in, and what Phaser's `rotation` (as opposed to its degree-based `angle`)
+// takes for drawing.
 export default function computeAngle(x: number, y: number) {
-	let zeroPoint = new Geom.Point(0, 0);
-	let angleRad = PhaserMath.Angle.BetweenPoints(zeroPoint, new PhaserMath.Vector2(x, y));
-	return PhaserMath.RadToDeg(angleRad);
+	return Math.atan2(y, x);
 }

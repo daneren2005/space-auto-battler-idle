@@ -8,11 +8,11 @@ import MoveToTargetWorker from './move-to-target.worker?worker';
 export function createMoveToTargetSystem(world: BaseWorld<typeof registry>) {
 	return new GameComponentSystem(world, {
 		name: 'moveToTargetSystem',
-		required: ['velocity', 'attack', 'position'],
+		required: ['velocity', 'attack', 'transform'],
 		updateFunction: moveToTargetUpdate,
 		getWorker: () => new MoveToTargetWorker(),
 		queries: {
-			targets: { required: ['position'] },
+			targets: { required: ['transform'] },
 		},
 	});
 }

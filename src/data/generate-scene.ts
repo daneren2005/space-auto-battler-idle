@@ -1,4 +1,5 @@
 import { factionColor } from './colors';
+import { factionCollision } from './collide-categories';
 
 export default function generateScene(options: OptionsConfig) {
 	let entities: Array<any> = [];
@@ -11,7 +12,9 @@ export default function generateScene(options: OptionsConfig) {
 			y,
 			type: 'station',
 			color: factionColor(i),
-			openShips: options.shipsPerStation ?? 10,
+			// Each generated station is its own faction, so it collides with everyone else's ships and not its own.
+			...factionCollision(i),
+			shipsPerSecond: options.shipsPerSecond ?? 1,
 		});
 	}
 
@@ -48,7 +51,7 @@ function distance(x1: number, y1: number, x2: number, y2: number): number {
 
 interface OptionsConfig {
 	stations?: number
-	shipsPerStation?: number
+	shipsPerSecond?: number
 	width: number
 	height: number
 }

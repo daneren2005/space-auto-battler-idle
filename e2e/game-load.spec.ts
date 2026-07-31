@@ -24,12 +24,12 @@ test('the game loads without any errors', async ({ page }) => {
 	expect(await page.evaluate(() => window.crossOriginIsolated)).toBe(true);
 
 	// The stats now render into the Phaser canvas (which the DOM can't read), so read them straight off the live
-	// GameScene instead.  maxUpdateTime starts at 0 and only becomes non-zero after the world has run real
-	// simulation ticks (its first ~1s reporting window), so waiting for it proves the game loop is live - not
-	// just mounted.  main.ts hangs the running game off window.__game for exactly this purpose.
+	// GameScene instead.  The world's own update timing starts at 0 and only becomes non-zero once it has run
+	// real simulation ticks (its first ~1s reporting window), so waiting for it proves the game loop is live -
+	// not just mounted.  main.ts hangs the running game off window.__game for exactly this purpose.
 	await page.waitForFunction(() => {
-		const scene = window.__game?.scene.getScene('game') as { stats?: { maxUpdateTime: number } } | null;
-		return typeof scene?.stats?.maxUpdateTime === 'number' && scene.stats.maxUpdateTime > 0;
+		const scene = window.__game?.scene.getScene('game') as { stats?: { timing: { update: { max: number } } } } | null;
+		return (scene?.stats?.timing.update.max ?? 0) > 0;
 	}, undefined, { timeout: 15000 });
 
 	expect(pageErrors, `Unexpected page errors:\n${pageErrors.join('\n')}`).toEqual([]);

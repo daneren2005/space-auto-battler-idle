@@ -8,7 +8,8 @@ import SpawnShipWorker from './spawn-ship.worker?worker';
 export function createSpawnShipSystem(world: BaseWorld<typeof registry>) {
 	return new GameComponentSystem(world, {
 		name: 'spawnShipSystem',
-		required: ['controller', 'position'],
+		// The body is required because a spawned ship inherits its station's collide category + mask from it.
+		required: ['controller', 'transform', 'body'],
 		updateFunction: spawnShipUpdate,
 		getWorker: () => new SpawnShipWorker(),
 	});

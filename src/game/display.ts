@@ -6,6 +6,13 @@
 export const DISPLAY_WIDTH = 720;
 export const DISPLAY_HEIGHT = 1280;
 
+// The landscape canvas the /stress-test page runs on.  That page is desktop-only on purpose, and its level is a
+// wide one - fitting a wide world into the portrait canvas above would zoom it down to an unreadably thin strip,
+// so the stress test flips the canvas instead.  The HUD lays itself out against whatever canvas it is given, so
+// nothing else has to change.
+export const WIDE_DISPLAY_WIDTH = 1280;
+export const WIDE_DISPLAY_HEIGHT = 720;
+
 // The HUD claims a band at the top (level / money / fleet text) and one at the bottom (the upgrade buttons).
 // The battle is confined to the strip between them so a station can never end up hidden behind either.
 export const HUD_TOP_HEIGHT = 110;

@@ -8,12 +8,14 @@ import TargetEnemyWorker from './target-enemy.worker?worker';
 export function createTargetEnemySystem(world: BaseWorld<typeof registry>) {
 	return new GameComponentSystem(world, {
 		name: 'targetEnemySystem',
-		required: ['velocity', 'attack', 'position', 'controlled'],
+		required: ['velocity', 'attack', 'transform', 'controlled'],
 		updateFunction: targetEnemyUpdate,
 		getWorker: () => new TargetEnemyWorker(),
 		queries: {
-			collidable: { required: ['position', 'health'], optional: ['controller', 'controlled'] },
-			stations: { required: ['controller', 'position'] },
+			// `body` only says which outline the transform describes, so the spatial index files a circular
+			// station under a circle rather than under the square it fits inside.
+			collidable: { required: ['transform', 'health'], optional: ['body', 'controller', 'controlled'] },
+			stations: { required: ['controller', 'transform'] },
 		},
 	});
 }

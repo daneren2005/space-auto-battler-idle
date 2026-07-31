@@ -3,8 +3,9 @@
 // the reload and lets earlier upgrades carry over.
 
 export interface Carry {
-	// How many of each upgrade type the player has bought across all levels so far.
-	openShipUpgrades: number
+	// How many of each upgrade type the player has bought across all levels so far.  Each shipRateUpgrade is one
+	// more ship a second on top of whatever the level's station starts with.
+	shipRateUpgrades: number
 	shieldUpgrades: number
 	// Unspent kill-reward money.
 	money: number
@@ -17,7 +18,7 @@ export interface Progress {
 const KEY = 'space-auto-battler-progress';
 
 export function emptyCarry(): Carry {
-	return { openShipUpgrades: 0, shieldUpgrades: 0, money: 0 };
+	return { shipRateUpgrades: 0, shieldUpgrades: 0, money: 0 };
 }
 
 export function loadProgress(): Progress {

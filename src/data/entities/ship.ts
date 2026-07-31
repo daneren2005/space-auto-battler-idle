@@ -1,9 +1,14 @@
 import type { Config } from '@/game/components';
 
-// A ship: small, fast, hunts enemies.  `attacks` opts it into the targeting component and `owner`
-// (its station's eid) is supplied per-spawn.  `steerForceBonus` rolls each ship somewhere between 10 and 15
-// steer force as it spawns, so no two turn at quite the same radius.
+// A ship: small, fast, hunts enemies.  It stays a 10x5 rectangle body - the default shape for a config with a
+// width and a height - so it is only as wide as it looks nose-on.  `attacks` opts it into the targeting
+// component and `owner` (its station's eid) is supplied per-spawn, along with the collide category + mask it
+// inherits from that station.  `steerForceBonus` rolls each ship somewhere between 10 and 15 steer force as it
+// spawns, so no two turn at quite the same radius.
+//
+// `velocityX` of 0 is what loads the velocity component: a ship spawned by a station overrides it with a real
+// heading, and one placed directly (a test, a scripted encounter) still starts out able to move.
 export const shipConfig: Config = {
 	type: 'ship', width: 10, height: 5, maxShields: 0, timeToRegenerateShields: 1, damageCooldown: 0.2,
-	speed: 100, attacks: true, steerForce: 10, steerForceBonus: 0.5,
+	velocityX: 0, speed: 100, attacks: true, steerForce: 10, steerForceBonus: 0.5,
 };

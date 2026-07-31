@@ -4,10 +4,9 @@ import type { Components, Config } from '../components';
 import type { Bounds } from '../systems/game-component-system';
 import { entityConfigs } from '@/data/entities';
 
-import { createVelocitySystem } from '../systems/velocity-system';
+import { createPhysicsSystem } from '../systems/physics-system';
 import { createUpdateHealthTimersSystem } from '../systems/update-health-timers-system';
 import { createSpawnShipSystem } from '../systems/spawn-ship-system';
-import { createCollisionSystem } from '../systems/collision-system';
 import { createTargetEnemySystem } from '../systems/target-enemy-system';
 import { createMoveToTargetSystem } from '../systems/move-to-target-system';
 
@@ -18,9 +17,12 @@ export interface Scene {
 }
 
 // The game's world.  It supplies the component registry + the per-type templates (a station's / ship's shared
-// static config, from data/entities) to the library's BaseWorld, and wires up the six systems that actually
+// static config, from data/entities) to the library's BaseWorld, and wires up the five systems that actually
 // play the game.  All of the heavy lifting - memory allocation, load/save, running systems on / off the main
 // thread - comes from the library; this class only declares what THIS game is made of.
+//
+// `update` is driven in milliseconds, which is what shared-memory-physics measures elapsedTime in (velocity is
+// per second, and the system converts).  Everything else that reads a clock does the same conversion.
 export default class GameWorld extends BaseWorld<typeof registry> {
 	bounds: Bounds = { width: 0, height: 0 };
 
@@ -42,10 +44,11 @@ export default class GameWorld extends BaseWorld<typeof registry> {
 	}
 
 	private initSystems() {
-		this.addSystem(createVelocitySystem(this));
 		this.addSystem(createUpdateHealthTimersSystem(this));
 		this.addSystem(createSpawnShipSystem(this));
-		this.addSystem(createCollisionSystem(this));
+		// Physics takes the slot the collision system used to hold, so movement + collisions still run after the
+		// frame's spawns rather than before them: a ship exists for a frame before anything can run into it.
+		this.addSystem(createPhysicsSystem(this));
 		this.addSystem(createTargetEnemySystem(this));
 		this.addSystem(createMoveToTargetSystem(this));
 	}

@@ -1,10 +1,16 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import GameWorld from '../entities/game-world';
+import { factionCollision } from '@/data/collide-categories';
 
-// Two distinct station colours.  Ships inherit their owning station's colour, and only different-coloured
-// entities count as enemies (collisions + targeting), so these pick who fights whom.
+// Two distinct station colours.  Ships inherit their owning station's colour, and targeting only ever picks a
+// different-coloured entity, so these pick who hunts whom.
 const RED = 0xff0000;
 const BLUE = 0x0000ff;
+
+// Who actually collides is a separate thing from colour: every entity a controller owns collides as that
+// faction's category and with every category but its own, so a faction's own ships pass through each other.
+const RED_FACTION = factionCollision(0);
+const BLUE_FACTION = factionCollision(1);
 
 // spawnShipUpdate caps a fresh ship's per-axis velocity at this magnitude (px/second).
 const SHIP_SPEED = 100;
@@ -19,23 +25,24 @@ afterEach(() => {
 	world = undefined;
 });
 
-// These tests step the world a frame at a time with `world.update(dt)` and assert straight afterwards.
+// These tests step the world a frame at a time with `world.update(dt)` - in milliseconds, which is what
+// shared-memory-physics measures elapsedTime in - and assert straight afterwards.
 //
 // There is no `Worker` global under vitest (see vitest.config.ts), so shared-memory-ecs runs each system's
-// update function in-process: by the time `update` returns, that frame's spawns, collisions, deaths and kill
-// rewards have all been applied.  In the browser the same update functions run on real Web Workers and their
-// results land a frame or more later, so a system there may sit out a frame while its worker is still busy -
-// that spreads the same work over more frames without changing what any of it does.
+// update function in-process: by the time `update` returns, that frame's spawns, movement, collisions, deaths
+// and kill rewards have all been applied.  In the browser the same update functions run on real Web Workers and
+// their results land a frame or more later, so a system there may sit out a frame while its worker is still busy
+// - that spreads the same work over more frames without changing what any of it does.
 
 // Every ship (controlled) and station (controller) stays on screen.
 function everyEntityWithinBounds(gameWorld: GameWorld, tolerance: number): boolean {
 	return gameWorld.entities.every(entity => {
-		const position = entity.components.position;
-		if(!position) {
+		const transform = entity.components.transform;
+		if(!transform) {
 			return true;
 		}
-		return position.x >= -tolerance && position.x <= gameWorld.bounds.width + tolerance
-			&& position.y >= -tolerance && position.y <= gameWorld.bounds.height + tolerance;
+		return transform.x >= -tolerance && transform.x <= gameWorld.bounds.width + tolerance
+			&& transform.y >= -tolerance && transform.y <= gameWorld.bounds.height + tolerance;
 	});
 }
 
@@ -45,29 +52,29 @@ describe('GameWorld game loop', () => {
 		world = new GameWorld();
 		world.load({
 			bounds,
-			// A single station: with no enemy colour anywhere, its ships never chase a target, so they simply
-			// drift on their spawn velocity and can only ever bounce off the walls.
+			// A single faction: its ships never target anything (no enemy colour anywhere) and never collide with
+			// each other (they all share its collide category), so they simply drift on their spawn velocity and can
+			// only ever bounce off the walls.
 			entities: [
-				{ type: 'station', color: RED, openShips: 20, x: 200, y: 200 },
+				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 1, x: 200, y: 200 },
 			],
 		});
 		await world.init();
 
-		const dt = 0.25;
-		const frames = Math.round(60 / dt);
+		const dt = 250;
+		const frames = Math.round(60_000 / dt);
 		for(let i = 0; i < frames; i++) {
 			world.update(dt);
 		}
 
-		// The station banked 20 openShips and spends one per frame, so all 20 ships spawned; a single-colour map
-		// has no collisions, so none of them died (and none returned its slot).
+		// One ship a second over a minute of play, and nothing a ship can collide with exists, so none of them died.
 		const ships = world.entities.filter(entity => !!entity.components.controlled);
-		expect(ships.length).toBe(20);
+		expect(ships.length).toBe(60);
 
 		// A ship can only ever overshoot a wall by a single frame of travel before the bounce turns it around.
 		// If bouncing were broken it would fly off unbounded (>6000px over a minute), so this tolerance cleanly
 		// separates "bounced" from "escaped".
-		const tolerance = SHIP_SPEED * dt + 1;
+		const tolerance = SHIP_SPEED * (dt / 1_000) + 1;
 		expect(everyEntityWithinBounds(world, tolerance)).toBe(true);
 	});
 
@@ -76,14 +83,14 @@ describe('GameWorld game loop', () => {
 		world.load({
 			bounds: { width: 400, height: 400 },
 			entities: [
-				{ type: 'station', color: RED, openShips: 20, x: 200, y: 200 },
+				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 20, x: 200, y: 200 },
 			],
 		});
 		await world.init();
 
-		// One ship spawns per station per frame, so this banks the whole fleet with frames to spare.
-		for(let i = 0; i < 25; i++) {
-			world.update(0.1);
+		// 20 ships a second over a second of play, in tenth-of-a-second frames: two ships out of each one.
+		for(let i = 0; i < 10; i++) {
+			world.update(100);
 		}
 
 		// Only ships attack, so only ships carry the component the steer force lives on.
@@ -102,13 +109,86 @@ describe('GameWorld game loop', () => {
 		expect(new Set(steerForces).size).toBe(steerForces.length);
 	});
 
+	it('launches as many ships a frame as its rate has earned, with no cap on the batch', async () => {
+		world = new GameWorld();
+		world.load({
+			bounds: { width: 400, height: 400 },
+			// 100 a second in tenth-of-a-second frames is 10 ships out of every single frame - far more than the old
+			// per-frame cap allowed.  A single faction again, so nothing can die and the count only ever goes up.
+			entities: [
+				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 100, x: 200, y: 200 },
+			],
+		});
+		await world.init();
+
+		const gameWorld = world;
+		const shipCount = () => gameWorld.entities.filter(entity => !!entity.components.controlled).length;
+
+		world.update(100);
+		expect(shipCount()).toBe(10);
+
+		world.update(100);
+		expect(shipCount()).toBe(20);
+
+		// The rate holds however long it is left running - there is no bank to run dry.
+		for(let i = 0; i < 8; i++) {
+			world.update(100);
+		}
+		expect(shipCount()).toBe(100);
+	});
+
+	it('carries the leftover fraction of a ship between frames so a slow rate still averages out', async () => {
+		world = new GameWorld();
+		world.load({
+			bounds: { width: 400, height: 400 },
+			entities: [
+				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 1, x: 200, y: 200 },
+			],
+		});
+		await world.init();
+
+		const gameWorld = world;
+		const shipCount = () => gameWorld.entities.filter(entity => !!entity.components.controlled).length;
+
+		// 0.4s of a 1s interval per frame: nothing until the banked time crosses a whole ship, and the 0.2s left
+		// over then counts towards the next one rather than being thrown away - so the second ship arrives at 2s
+		// exactly, not at 2.4s.
+		world.update(400);
+		expect(shipCount()).toBe(0);
+		world.update(400);
+		expect(shipCount()).toBe(0);
+		world.update(400);
+		expect(shipCount()).toBe(1);
+		world.update(400);
+		expect(shipCount()).toBe(1);
+		world.update(400);
+		expect(shipCount()).toBe(2);
+	});
+
+	it('never spawns for a station with no rate at all', async () => {
+		world = new GameWorld();
+		world.load({
+			bounds: { width: 400, height: 400 },
+			entities: [
+				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 0, x: 200, y: 200 },
+			],
+		});
+		await world.init();
+
+		for(let i = 0; i < 20; i++) {
+			world.update(250);
+		}
+
+		expect(world.entities.filter(entity => !!entity.components.controlled)).toHaveLength(0);
+	});
+
 	it('destroys both ships and pays each owning station when evenly matched enemies collide', async () => {
 		world = new GameWorld();
 		world.load({
 			bounds: { width: 400, height: 400 },
 			entities: [
-				{ type: 'station', color: RED, openShips: 0, x: 20, y: 20 },
-				{ type: 'station', color: BLUE, openShips: 0, x: 380, y: 380 },
+				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 0, x: 20, y: 20 },
+				{ type: 'station', color: BLUE, ...BLUE_FACTION, shipsPerSecond: 0, x: 380, y: 380 },
 			],
 		});
 		await world.init();
@@ -116,19 +196,18 @@ describe('GameWorld game loop', () => {
 		const redStation = world.entities[0];
 		const blueStation = world.entities[1];
 
-		// Two enemy ships dropped on the exact same spot: overlapping + different colours means they collide
-		// every eligible frame, and since each is the other's nearest target the steering resolves to a zero
-		// nudge - so they sit still and keep trading blows.  timeToRegenerateShields is pushed far out so shields
-		// can't tick back up and stall the fight.
-		const red = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: redStation.eid, timeToRegenerateShields: 1000 });
-		const blue = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: blueStation.eid, timeToRegenerateShields: 1000 });
+		// Two enemy ships dropped on the exact same spot: overlapping bodies in each other's collide mask means
+		// they collide every eligible frame, and since each is the other's nearest target the steering resolves to
+		// a zero nudge - so they sit still and keep trading blows.  timeToRegenerateShields is pushed far out so
+		// shields can't tick back up and stall the fight.
+		const red = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION, timeToRegenerateShields: 1000 });
+		const blue = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: blueStation.eid, ...BLUE_FACTION, timeToRegenerateShields: 1000 });
 		const redEid = red.eid;
 		const blueEid = blue.eid;
 
-		// dt sits above the 0.2s damage cooldown so a hit lands on every eligible frame.  Both ships have one
-		// shield, so the first exchange drops them to zero and the second is mutually fatal.
+		// dt sits above the 0.2s damage cooldown so a hit lands on every eligible frame.
 		for(let i = 0; i < 40 && (world.getEntityByEid(redEid) || world.getEntityByEid(blueEid)); i++) {
-			world.update(0.25);
+			world.update(250);
 		}
 
 		expect(world.getEntityByEid(redEid)).toBeUndefined();
@@ -136,10 +215,9 @@ describe('GameWorld game loop', () => {
 		// Each ship landed a killing blow on the other, so each station earned a single-ship kill reward.
 		expect(redStation.components.controller!.money).toBe(1);
 		expect(blueStation.components.controller!.money).toBe(1);
-		// A dead ship returns its slot to its OWN owner (money is never transferred between factions), so each
-		// station gets one openShip back to rebuild with.
-		expect(redStation.components.controller!.openShips).toBe(1);
-		expect(blueStation.components.controller!.openShips).toBe(1);
+		// Losing a ship costs a faction nothing but the ship: its spawn rate is untouched by the death.
+		expect(redStation.components.controller!.shipsPerSecond).toBe(0);
+		expect(blueStation.components.controller!.shipsPerSecond).toBe(0);
 	});
 
 	it('pays only the winning station when a stronger ship outlasts a weaker enemy', async () => {
@@ -147,8 +225,8 @@ describe('GameWorld game loop', () => {
 		world.load({
 			bounds: { width: 400, height: 400 },
 			entities: [
-				{ type: 'station', color: RED, openShips: 0, x: 20, y: 20 },
-				{ type: 'station', color: BLUE, openShips: 0, x: 380, y: 380 },
+				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 0, x: 20, y: 20 },
+				{ type: 'station', color: BLUE, ...BLUE_FACTION, shipsPerSecond: 0, x: 380, y: 380 },
 			],
 		});
 		await world.init();
@@ -158,13 +236,13 @@ describe('GameWorld game loop', () => {
 
 		// Same overlapping stand-off, but the red ship carries three shields to the blue ship's one, so red
 		// survives the exchange and blue is destroyed.
-		const red = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: redStation.eid, maxShields: 3, timeToRegenerateShields: 1000 });
-		const blue = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: blueStation.eid, maxShields: 1, timeToRegenerateShields: 1000 });
+		const red = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION, maxShields: 3, timeToRegenerateShields: 1000 });
+		const blue = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: blueStation.eid, ...BLUE_FACTION, maxShields: 1, timeToRegenerateShields: 1000 });
 		const redEid = red.eid;
 		const blueEid = blue.eid;
 
 		for(let i = 0; i < 40 && world.getEntityByEid(blueEid); i++) {
-			world.update(0.25);
+			world.update(250);
 		}
 
 		const survivor = world.getEntityByEid(redEid);
@@ -173,10 +251,163 @@ describe('GameWorld game loop', () => {
 		// The winner's station earned the kill reward; the loser's station got nothing.
 		expect(redStation.components.controller!.money).toBe(1);
 		expect(blueStation.components.controller!.money).toBe(0);
-		// Only the destroyed (blue) ship returned its slot, and it went to its own owner - not the winner.
-		expect(blueStation.components.controller!.openShips).toBe(1);
-		expect(redStation.components.controller!.openShips).toBe(0);
 		// Red traded two of its three shields (one per exchange) to land the kill.
 		expect(survivor!.components.health!.shields).toBe(1);
+	});
+});
+
+describe('GameWorld targeting', () => {
+	// The two stations every targeting test needs: one of each colour, with no spawn rate so no ship launches on
+	// its own and the only ships in the world are the ones the test placed.
+	async function loadTwoStations(): Promise<GameWorld> {
+		const gameWorld = new GameWorld();
+		gameWorld.load({
+			bounds: { width: 400, height: 400 },
+			entities: [
+				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 0, x: 20, y: 20 },
+				{ type: 'station', color: BLUE, ...BLUE_FACTION, shipsPerSecond: 0, x: 380, y: 380 },
+			],
+		});
+		await gameWorld.init();
+
+		return gameWorld;
+	}
+
+	it('picks the nearest enemy ship', async () => {
+		world = await loadTwoStations();
+		const redStation = world.entities[0];
+		const blueStation = world.entities[1];
+
+		const hunter = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION });
+		const near = world.loadEntity({ type: 'ship', x: 240, y: 200, owner: blueStation.eid, ...BLUE_FACTION });
+		world.loadEntity({ type: 'ship', x: 300, y: 200, owner: blueStation.eid, ...BLUE_FACTION });
+
+		world.update(16);
+
+		expect(hunter.components.attack!.target).toBe(near.eid);
+	});
+
+	it('ignores a friendly ship sitting closer than the enemy', async () => {
+		world = await loadTwoStations();
+		const redStation = world.entities[0];
+		const blueStation = world.entities[1];
+
+		const hunter = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION });
+		// Its own colour, and half the distance away - so a target picked on distance alone would be this one.
+		world.loadEntity({ type: 'ship', x: 230, y: 200, owner: redStation.eid, ...RED_FACTION });
+		const enemy = world.loadEntity({ type: 'ship', x: 260, y: 200, owner: blueStation.eid, ...BLUE_FACTION });
+
+		world.update(16);
+
+		expect(hunter.components.attack!.target).toBe(enemy.eid);
+	});
+
+	it('heads for the nearest enemy station when no enemy ship is in range', async () => {
+		world = new GameWorld();
+		world.load({
+			bounds: { width: 400, height: 400 },
+			entities: [
+				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 0, x: 20, y: 20 },
+				{ type: 'station', color: BLUE, ...BLUE_FACTION, shipsPerSecond: 0, x: 380, y: 380 },
+				{ type: 'station', color: BLUE, ...BLUE_FACTION, shipsPerSecond: 0, x: 200, y: 380 },
+			],
+		});
+		await world.init();
+
+		const redStation = world.entities[0];
+		const nearerBlueStation = world.entities[2];
+
+		// Both blue stations are well past the range a ship searches for enemies in, so this is the fallback
+		// picking between them rather than the search finding one.
+		const hunter = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION });
+
+		world.update(16);
+
+		expect(hunter.components.attack!.target).toBe(nearerBlueStation.eid);
+	});
+
+	it('targets nothing when every other entity shares its colour', async () => {
+		world = new GameWorld();
+		world.load({
+			bounds: { width: 400, height: 400 },
+			entities: [
+				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 0, x: 20, y: 20 },
+			],
+		});
+		await world.init();
+
+		const station = world.entities[0];
+		const hunter = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: station.eid, ...RED_FACTION });
+		world.loadEntity({ type: 'ship', x: 210, y: 200, owner: station.eid, ...RED_FACTION });
+
+		world.update(16);
+
+		// Neither the search nor the station fallback has anything to offer, and 0 is how "no target" is stored.
+		expect(hunter.components.attack!.target).toBe(0);
+	});
+});
+
+describe('GameWorld collision filtering', () => {
+	it('lets two ships of the same faction sit on top of each other unharmed', async () => {
+		world = new GameWorld();
+		world.load({
+			bounds: { width: 400, height: 400 },
+			entities: [
+				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 0, x: 20, y: 20 },
+			],
+		});
+		await world.init();
+
+		const station = world.entities[0];
+		// Overlapping exactly, as in the fights above - but both fly for the same faction, so neither one's mask
+		// accepts the other's category and the physics broadphase never reports the pair at all.
+		const first = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: station.eid, ...RED_FACTION, maxShields: 3, timeToRegenerateShields: 1000 });
+		const second = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: station.eid, ...RED_FACTION, maxShields: 3, timeToRegenerateShields: 1000 });
+
+		for(let i = 0; i < 10; i++) {
+			world.update(250);
+		}
+
+		expect(world.getEntityByEid(first.eid)).toBeDefined();
+		expect(world.getEntityByEid(second.eid)).toBeDefined();
+		expect(first.components.health!.shields).toBe(3);
+		expect(second.components.health!.shields).toBe(3);
+		// Nothing died, so nothing was ever paid out.
+		expect(station.components.controller!.money).toBe(0);
+	});
+
+	it('collides a ship with an enemy station and destroys the station with its whole fleet', async () => {
+		world = new GameWorld();
+		world.load({
+			bounds: { width: 400, height: 400 },
+			entities: [
+				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 0, x: 20, y: 20 },
+				// maxShields 0, so the first hit that lands on it is fatal.
+				{ type: 'station', color: BLUE, ...BLUE_FACTION, shipsPerSecond: 0, x: 200, y: 200, maxShields: 0 },
+			],
+		});
+		await world.init();
+
+		const redStation = world.entities[0];
+		const blueStation = world.entities[1];
+
+		// A ship of the blue fleet, parked away from the fight: it dies with its station rather than to a collision.
+		const blueShip = world.loadEntity({ type: 'ship', x: 350, y: 350, owner: blueStation.eid, ...BLUE_FACTION, maxShields: 3, timeToRegenerateShields: 1000 });
+		// A red ship sat right on the blue station.  A station is a circle body 20 across, so the ship overlaps it.
+		const redShip = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION, maxShields: 3, timeToRegenerateShields: 1000 });
+		const blueShipEid = blueShip.eid;
+		const blueStationEid = blueStation.eid;
+
+		for(let i = 0; i < 10 && world.getEntityByEid(blueStationEid); i++) {
+			world.update(250);
+		}
+
+		expect(world.getEntityByEid(blueStationEid)).toBeUndefined();
+		// A destroyed station takes its whole fleet down with it.
+		expect(world.getEntityByEid(blueShipEid)).toBeUndefined();
+		// The station was worth its fleet (the one ship it had) to the faction that killed it.
+		expect(redStation.components.controller!.money).toBe(1);
+		// The red ship survived on its remaining shields.
+		expect(world.getEntityByEid(redShip.eid)).toBeDefined();
 	});
 });

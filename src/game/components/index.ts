@@ -1,16 +1,16 @@
 import type { ComponentsOf, EntityConfigOf } from '@daneren2005/shared-memory-ecs';
-import { positionDefinition } from './position';
-import { velocityDefinition } from './velocity';
+import { physicsRegistry } from '@daneren2005/shared-memory-physics';
 import { healthDefinition } from './health';
 import { controllerDefinition } from './controller';
 import { controlledDefinition } from './controlled';
 import { attackDefinition } from './attack';
 
 // One place declares every component; the world derives its typed component map + flat entity config from it.
-// Each component's own memory layout, interfaces, and definition live in its own file in this folder.
+// `transform` (where/how big/facing), `velocity` and `body` (what shape, what it collides with) all come from
+// shared-memory-physics - the same library supplies the PhysicsSystem that reads them - so this game only
+// declares what is specific to it.  Each of those lives in its own file in this folder.
 export const registry = {
-	position: positionDefinition,
-	velocity: velocityDefinition,
+	...physicsRegistry,
 	health: healthDefinition,
 	controller: controllerDefinition,
 	controlled: controlledDefinition,

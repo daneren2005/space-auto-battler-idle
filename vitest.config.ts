@@ -6,6 +6,12 @@ export default defineConfig({
 		alias: {
 			'@': fileURLToPath(new URL('./src', import.meta.url)),
 		},
+		// shared-memory-physics is linked in from a sibling checkout and would otherwise load its own copies of
+		// these two peer dependencies, so the world under test and the physics system would not share a heap.
+		dedupe: [
+			'@daneren2005/shared-memory-ecs',
+			'@daneren2005/shared-memory-objects',
+		],
 	},
 	test: {
 		globals: true,

@@ -1,5 +1,6 @@
 import type { LevelConfig } from './types';
 import { PLAYER_COLOR, ENEMY_COLOR } from '@/data/colors';
+import { factionCollision } from '@/data/collide-categories';
 
 // The playing field is deliberately small so ships cross it quickly, and portrait so it fills the tall mobile
 // canvas; later levels bump these up (the display is a fixed size and the game camera zooms to fit whatever
@@ -10,7 +11,10 @@ const MARGIN = 80;
 
 // The starting level: the player's station sits at the bottom - nearest the upgrade buttons they tap - and a
 // single enemy station at the top, both horizontally centred so their fleets meet in the middle.  Each faction
-// starts with 2 openShips (two ship slots) and 0 shields, so ships die in a single hit and kills come quickly.
+// launches one ship a second and gives it no shields, so ships die in a single hit and kills come quickly - and
+// with the two sides on the same rate, the player only pulls ahead by buying upgrades.  factionCollision gives
+// each station (and so its ships) a collide category of its own, which is what keeps a faction's own ships from
+// running into each other.
 export const level1: LevelConfig = {
 	name: 'level-1',
 	title: 'First Contact',
@@ -22,8 +26,9 @@ export const level1: LevelConfig = {
 			x: WIDTH / 2,
 			y: HEIGHT - MARGIN,
 			color: PLAYER_COLOR,
+			...factionCollision(0),
 			player: true,
-			openShips: 2,
+			shipsPerSecond: 1,
 			shipShields: 0,
 		},
 		{
@@ -31,7 +36,8 @@ export const level1: LevelConfig = {
 			x: WIDTH / 2,
 			y: MARGIN,
 			color: ENEMY_COLOR,
-			openShips: 2,
+			...factionCollision(1),
+			shipsPerSecond: 1,
 			shipShields: 0,
 		},
 	],

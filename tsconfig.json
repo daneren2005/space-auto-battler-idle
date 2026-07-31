@@ -13,6 +13,16 @@
 		"paths": {
 			"@/*": [
 				"./src/*"
+			],
+			// shared-memory-physics is linked in from a sibling checkout (file:../shared-memory-physics) rather than
+			// installed from npm, so its own node_modules holds a second copy of these two peer dependencies.  Both
+			// copies' types would otherwise be distinct - and MemoryHeap's private fields make them incompatible - so
+			// pin every import of them, this project's and the linked package's, to the one copy installed here.
+			"@daneren2005/shared-memory-ecs": [
+				"./node_modules/@daneren2005/shared-memory-ecs/dist/index.d.ts"
+			],
+			"@daneren2005/shared-memory-objects": [
+				"./node_modules/@daneren2005/shared-memory-objects/dist/src/main.d.ts"
 			]
 		},
 		"lib": [
@@ -27,6 +37,7 @@
 	},
 	"include": [
 		"src/**/*.ts",
+		"e2e/**/*.ts",
 		"*.config.ts"
 	],
 	"exclude": [

@@ -26,14 +26,14 @@ describe('progress', () => {
 	});
 
 	it('round-trips a saved progress record', () => {
-		const progress = { levelIndex: 1, carry: { openShipUpgrades: 3, shieldUpgrades: 2, money: 7 } };
+		const progress = { levelIndex: 1, carry: { shipRateUpgrades: 3, shieldUpgrades: 2, money: 7 } };
 		saveProgress(progress);
 		expect(loadProgress()).toEqual(progress);
 	});
 
 	it('backfills missing carry fields from a partial record', () => {
-		saveProgress({ levelIndex: 1, carry: { openShipUpgrades: 4 } as never });
-		expect(loadProgress()).toEqual({ levelIndex: 1, carry: { openShipUpgrades: 4, shieldUpgrades: 0, money: 0 } });
+		saveProgress({ levelIndex: 1, carry: { shipRateUpgrades: 4 } as never });
+		expect(loadProgress()).toEqual({ levelIndex: 1, carry: { shipRateUpgrades: 4, shieldUpgrades: 0, money: 0 } });
 	});
 
 	it('reset clears back to the default', () => {

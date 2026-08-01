@@ -1,7 +1,13 @@
 import Phaser from 'phaser';
 import { PerformanceTiming } from '@daneren2005/shared-memory-ecs';
 import type { BaseEntity, PerformanceStats } from '@daneren2005/shared-memory-ecs';
-import { POSITION_UPDATED_EVENT } from '@daneren2005/shared-memory-physics';
+import {
+	INTERPOLATION_X_INDEX,
+	INTERPOLATION_Y_INDEX,
+	TRANSFORM_X_INDEX,
+	TRANSFORM_Y_INDEX,
+	TRANSFORM_ANGLE_INDEX,
+} from '@daneren2005/shared-memory-physics';
 import prettyMemory from '@/data/pretty-memory';
 import type { LevelConfig } from '@/data/levels';
 import { getLevelIndex } from '@/data/levels';
@@ -9,16 +15,36 @@ import type { Carry } from '@/data/progress';
 import { saveProgress, resetProgress } from '@/data/progress';
 import type { Components } from './components';
 import { CONTROLLER_MONEY, CONTROLLER_SHIPS_PER_SECOND, CONTROLLER_SHIP_SHIELDS } from './components/controller';
+import { HEALTH_SHIELDS } from './components/health';
 import { playAreaViewport } from './display';
 import type GameWorld from './entities/game-world';
+import entityList from './entities/entity-list';
 
 // A live entity as this scene sees it: the world's entity type narrowed to this game's component map.
 type GameEntity = BaseEntity<Components>;
 
 // The pair of images one entity is drawn with: its hull, and the shield bubble that rides on top of it.  The
 // shield hangs off the hull rather than living in a second map so a sync only costs one lookup.
+//
+// The two shared-memory blocks it is drawn from hang off it as well, resolved once when the sprite is set up.
+// Everything here could be reached through `entity.components.transform.x` instead, but that walks five
+// objects and ends in a getter closure, and with thousands of entities alive those call sites are megamorphic
+// so none of it inlines: measured at ~940ns an entity against ~140ns for the same values read off the blocks.
+// A sprite is synced for every ship that moved on every physics run, which is the one place in this game where
+// that difference is worth caring about.
+//
+// Holding the blocks means holding the assumption that an entity's transform and health are loaded when it is
+// created and never swapped out - true here, and the sprite is thrown away with the entity either way.
 type EntitySprite = Phaser.GameObjects.Image & {
 	shieldImage: Phaser.GameObjects.Image
+	// Float32Array: read through TRANSFORM_*_INDEX.
+	transformBlock: Float32Array
+	// Where to *draw* it, read through INTERPOLATION_*_INDEX: the transform only changes when a physics step
+	// lands, so a sprite following it directly would move on one frame in three.  Null for an entity the game
+	// never asked to interpolate - a station, which never moves - where the transform is the answer already.
+	interpolationBlock: Float32Array | null
+	// Float32Array or null for something with no health at all: read through HEALTH_SHIELDS.
+	healthBlock: Float32Array | null
 };
 
 // A single station's ship tally, used to render the per-team breakdown in the debug panel.
@@ -97,6 +123,8 @@ export default class GameScene extends Phaser.Scene {
 
 	private paused = false;
 	private eidSpriteMap = new Map<number, EntitySprite>();
+	// Hull + shield pairs whose entity has died, hidden and kept for the next ship rather than destroyed.
+	private spritePool: Array<EntitySprite> = [];
 
 	// The station eid the human plays; -1 until the level is loaded.  Only this faction's money is spendable.
 	private playerStationEid = -1;
@@ -136,23 +164,19 @@ export default class GameScene extends Phaser.Scene {
 		this.cameras.main.setZoom(zoom);
 		this.cameras.main.centerOn(bounds.width / 2, bounds.height / 2);
 
-		// PerformanceTiming closes a reporting window roughly once a second; ride it for the rest of the panel so
-		// the whole snapshot is from the same moment.  It fires at the tail of world.update, after it has banked
-		// that frame's cost, so the sweep below is not counted against the frame it happens on.
-		this.timing.on('stats-updated', () => {
-			this.refreshStats();
-			this.syncAllSprites();
-		});
+		// PerformanceTiming closes a reporting window roughly once a second; ride it for the panel so the whole
+		// snapshot is from the same moment.  There is no sprite catch-up hanging off it any more: syncSprites
+		// covers every sprite every frame, so there is nothing left for a periodic sweep to find.
+		this.timing.on('stats-updated', () => this.refreshStats());
 		this.events.once('shutdown', () => this.timing.destroy());
 
-		// Destroy a sprite as soon as its entity is removed (killEntityWorker -> world removes it).  The move
-		// listener added in addSprite goes with the entity itself, which the world drops at the same time.
+		// Take a sprite out of play as soon as its entity is removed (killEntityWorker -> world removes it), and
+		// keep it for the next ship to be launched rather than destroying it - see releaseSprite.
 		this.world.on('entity-removed', (entity: { eid: number }) => {
 			let sprite = this.eidSpriteMap.get(entity.eid);
 			if(sprite) {
-				sprite.destroy();
-				sprite.shieldImage.destroy();
 				this.eidSpriteMap.delete(entity.eid);
+				this.releaseSprite(sprite);
 			}
 		});
 
@@ -163,7 +187,13 @@ export default class GameScene extends Phaser.Scene {
 		this.world.entities.forEach(entity => this.addSprite(entity));
 		this.world.on('entity-added', (entity: GameEntity) => this.addSprite(entity));
 
-		let stations = this.world.entities.filter(entity => entity.components.controller);
+		// Nothing listens to POSITION_UPDATED_EVENT.  Sprites are synced from `update` every frame instead, because
+		// that event fires once per 50ms physics step and a sprite following it would move three times a second's
+		// worth in one go - which is the choppiness the interpolation component exists to hide.  Leaving it
+		// unlistened is not just a no-op either: PhysicsSystem checks per run whether anything is listening and,
+		// when nothing is, the worker stops pushing an id per moved ship into the run's event array and stops
+		// cloning that array back across the boundary.
+		let stations = entityList(this.world).filter(entity => entity.components.controller);
 		this.stationShips = stations.map(station => {
 			let color = station.components.controller!.color;
 			let displayColor = '#' + color.toString(16);
@@ -213,74 +243,126 @@ export default class GameScene extends Phaser.Scene {
 		}
 
 		// The world runs in milliseconds, which is Phaser's delta as it comes and what shared-memory-physics
-		// measures elapsedTime in.  Sprites are no longer synced from here: each move arrives as a
-		// POSITION_UPDATED_EVENT once the physics run that made it completes (see addSprite), so this frame costs
-		// nothing per entity that did not move.
+		// measures elapsedTime in.
 		this.world.update(delta);
+
+		// Every sprite, every frame, straight off the shared blocks the workers and the interpolation system have
+		// already written.  One pass over the fleet a frame is the whole cost of drawing it: there is no event to
+		// wait for, no id list to walk and no map lookup, because nothing here needs to know *which* ships moved -
+		// at these counts, nearly all of them did.
+		this.syncSprites();
 
 		this.checkForGameOver();
 	}
 
-	// Builds the hull + shield pair an entity is drawn with, puts it where the entity currently stands, and
-	// subscribes to the moves physics reports for it.  Anything without a transform - there is nowhere to draw it -
-	// is skipped.
+	// Builds the hull + shield pair an entity is drawn with and puts it where the entity currently stands.
+	// Anything without a transform - there is nowhere to draw it - is skipped.  Nothing is subscribed here: the
+	// moves arrive on the physics system for the whole run at once (see syncMovedSprites), so a sprite costs no
+	// listener of its own.
 	private addSprite(entity: GameEntity) {
 		const transform = entity.components.transform;
 		if(!transform || this.eidSpriteMap.has(entity.eid)) {
 			return;
 		}
 
-		// `shieldImage` is attached straight after, which is what makes this an EntitySprite rather than a bare
-		// Image; Phaser's factory can only hand back the latter.
-		const sprite = this.add.image(0, 0, entity.components.controller ? 'station' : 'boid') as EntitySprite;
-		sprite.setScale(transform.width / sprite.width, transform.height / sprite.height);
+		// A pair a dead ship left behind, if there is one - see releaseSprite.  Ships die and launch at roughly
+		// the same rate, so in a running battle almost every new one is dressed up out of the pool.
+		const sprite = this.spritePool.pop() ?? this.createSprite();
+		this.dressSprite(sprite, entity, transform);
+		this.eidSpriteMap.set(entity.eid, sprite);
+
+		// Nothing has moved yet, so place it where it starts.
+		this.syncSprite(sprite);
+	}
+
+	// A fresh, undressed hull + shield pair.  `shieldImage` and the blocks are attached by dressSprite, which is
+	// what makes this an EntitySprite rather than a bare Image; Phaser's factory can only hand back the latter.
+	private createSprite(): EntitySprite {
+		const sprite = this.add.image(0, 0, 'boid') as EntitySprite;
 		sprite.shieldImage = this.add.image(0, 0, 'shield');
+
+		return sprite;
+	}
+
+	// Points an (possibly recycled) sprite at an entity: its artwork, size, colour, and the shared-memory blocks
+	// it will be drawn from.  Everything an entity can differ from the last owner of this sprite in is set here,
+	// so a pooled pair is indistinguishable from a new one.
+	private dressSprite(sprite: EntitySprite, entity: GameEntity, transform: NonNullable<GameEntity['components']['transform']>) {
+		// Before the scale below, which is worked out from the texture's own size.
+		sprite.setTexture(entity.components.controller ? 'station' : 'boid');
+		sprite.setScale(transform.width / sprite.width, transform.height / sprite.height);
 		// The shield art points up (front-to-back runs along its Y axis) whereas the entity's `width` is its
 		// front-to-back length, so map width -> shield Y and height -> shield X to keep it skinny like the ship.
 		sprite.shieldImage.setScale(transform.height / sprite.shieldImage.width * 2, transform.width / sprite.shieldImage.height * 2);
 		sprite.setTint(this.getTint(entity.eid));
-		this.eidSpriteMap.set(entity.eid, sprite);
 
-		// The physics system reports where an entity ended up on the entity itself, once the run that moved it
-		// completes - so a sprite only costs anything on the runs its entity actually moved, rather than every
-		// entity costing a sync every frame whether it went anywhere or not.
-		entity.on(POSITION_UPDATED_EVENT, (x: number, y: number) => {
-			this.syncSprite(entity, sprite, x, y);
-		});
+		const registry = this.world.registry;
+		sprite.transformBlock = registry.transform.memoryComponent.getBlock(transform.index) as Float32Array;
+		const interpolation = entity.components.interpolation;
+		sprite.interpolationBlock = interpolation ? registry.interpolation.memoryComponent.getBlock(interpolation.index) as Float32Array : null;
+		const health = entity.components.health;
+		sprite.healthBlock = health ? registry.health.memoryComponent.getBlock(health.index) as Float32Array : null;
 
-		// Nothing has moved yet, so place it where it starts.
-		this.syncSprite(entity, sprite, transform.x, transform.y);
+		sprite.visible = true;
+		// syncSprite decides whether the shield itself shows, off the block just resolved.
+		sprite.shieldImage.visible = false;
 	}
 
-	// Puts one entity's sprite where the entity is.  `x` / `y` are passed in because the move event carries them,
-	// which saves reading them back out of the shared block on the hot path.
-	private syncSprite(entity: GameEntity, sprite: EntitySprite, x: number, y: number) {
-		// x/y are the centre of the transform, which is where Phaser draws an image from by default.
-		sprite.x = sprite.shieldImage.x = x;
-		sprite.y = sprite.shieldImage.y = y;
+	// Takes a dead entity's sprite out of play and keeps it for the next ship to be launched, rather than
+	// destroying it.  Phaser's display list is a plain array and removing from it is an indexOf + splice across
+	// every sprite on screen, so at a few thousand ships a destroy cost ~40us and grew with the fleet - which,
+	// at dozens of deaths a physics run, was the second largest thing on this thread.  Hiding costs nothing and
+	// leaves the pair where the renderer can skip it.
+	//
+	// The pool only ever holds sprites the game has already had on screen at once, so it is bounded by the peak
+	// entity count rather than growing without limit.
+	private releaseSprite(sprite: EntitySprite) {
+		sprite.visible = false;
+		sprite.shieldImage.visible = false;
+		this.spritePool.push(sprite);
+	}
+
+	// Puts one entity's sprite where its entity is.  Everything it draws with - position, facing, whether the
+	// shield is up - is read straight out of the shared-memory blocks resolved when the sprite was dressed,
+	// which already hold whatever the workers wrote, so nothing has to be handed to it and nothing is looked up
+	// on the way.
+	private syncSprite(sprite: EntitySprite) {
+		const transform = sprite.transformBlock;
+		const shield = sprite.shieldImage;
+		const interpolation = sprite.interpolationBlock;
+
+		// x/y are the centre of the entity, which is where Phaser draws an image from by default.  They come out
+		// of the interpolation block rather than the transform: the transform only changes when a 50ms physics
+		// step lands, while the render position is rewritten every frame between the two positions that step ran
+		// between.  Null for a station, which nothing ever moves, so where it is and where to draw it are the
+		// same place.
+		if(interpolation) {
+			sprite.x = shield.x = interpolation[INTERPOLATION_X_INDEX];
+			sprite.y = shield.y = interpolation[INTERPOLATION_Y_INDEX];
+		} else {
+			sprite.x = shield.x = transform[TRANSFORM_X_INDEX];
+			sprite.y = shield.y = transform[TRANSFORM_Y_INDEX];
+		}
 
 		// `rotation`, not `angle`: the transform's facing is in radians (0 pointing right, as Phaser has it).
-		// Facing is not part of the move event, so it still comes off the transform - which lives in shared
-		// memory, so it already holds whatever the worker wrote during the run that reported this move.
-		const angle = entity.components.transform?.angle ?? 0;
+		const angle = transform[TRANSFORM_ANGLE_INDEX];
 		sprite.rotation = angle;
 		// The shield art has its front edge at the top rather than the right, so turn it a quarter turn further
 		// to line its front up with the heading.
-		sprite.shieldImage.rotation = angle + Math.PI / 2;
-		sprite.shieldImage.visible = (entity.components.health?.shields ?? 0) > 0;
+		shield.rotation = angle + Math.PI / 2;
+		const health = sprite.healthBlock;
+		shield.visible = health !== null && health[HEALTH_SHIELDS] > 0;
 	}
 
-	// Catches up everything the move events cannot: shields drain and regenerate in shared memory without an
-	// event of their own, and an entity that is standing still - a station, and in future a ship holding station -
-	// gets no move to hang the check off.  Cheap enough to run once a second over the whole world.
-	private syncAllSprites() {
-		this.world.entities.forEach(entity => {
-			const sprite = this.eidSpriteMap.get(entity.eid);
-			const transform = entity.components.transform;
-			if(sprite && transform) {
-				this.syncSprite(entity, sprite, transform.x, transform.y);
-			}
-		});
+	// Every sprite, once per rendered frame.  This is the hot path of the frame at a few thousand ships, and it
+	// is deliberately unconditional: it costs one pass over the fleet, where following the physics system's move
+	// events cost a pass over an id list plus a map lookup per id *and* still only moved things twenty times a
+	// second.  Facing and shields ride along because they are two reads on blocks this is already holding.
+	//
+	// It also picks up what no move event ever could - shields draining and regenerating in shared memory, and
+	// anything standing still - so there is no periodic catch-up sweep either.
+	private syncSprites() {
+		this.eidSpriteMap.forEach(sprite => this.syncSprite(sprite));
 	}
 
 	// --- Meta-game state the UIScene renders ------------------------------------------------------------
@@ -317,7 +399,16 @@ export default class GameScene extends Phaser.Scene {
 		return this.playerController?.shipsPerSecond ?? 0;
 	}
 	get playerShips(): number {
-		return this.world.entities.filter(entity => entity.components.controlled?.owner === this.playerStationEid).length;
+		// Counted rather than filtered: the HUD reads this every frame, and at a few thousand ships an array of
+		// them thrown away immediately is not worth building.
+		let ships = 0;
+		this.world.entities.forEach(entity => {
+			if(entity.components.controlled?.owner === this.playerStationEid) {
+				ships++;
+			}
+		});
+
+		return ships;
 	}
 
 	// Cost of the next ship-rate upgrade: 1, 2, 4, 8, ... (doubles with each one bought).
@@ -424,16 +515,26 @@ export default class GameScene extends Phaser.Scene {
 		return this.world.getEntityByEid(this.playerStationEid)?.components.controller;
 	}
 
+	// Runs every frame, so it answers both questions in the one pass over the world and builds no list of
+	// stations to throw away straight after.
 	private checkForGameOver() {
-		const controllers = this.world.entities.filter(entity => entity.components.controller);
-		const playerAlive = controllers.some(entity => entity.eid === this.playerStationEid);
+		let playerAlive = false;
+		let enemiesAlive = false;
+		this.world.entities.forEach(entity => {
+			if(!entity.components.controller) {
+				return;
+			}
+
+			if(entity.eid === this.playerStationEid) {
+				playerAlive = true;
+			} else {
+				enemiesAlive = true;
+			}
+		});
+
 		if(!playerAlive) {
 			this.state = 'lost';
-			return;
-		}
-
-		const enemiesAlive = controllers.some(entity => entity.eid !== this.playerStationEid);
-		if(!enemiesAlive) {
+		} else if(!enemiesAlive) {
 			this.state = 'won';
 		}
 	}
@@ -448,13 +549,10 @@ export default class GameScene extends Phaser.Scene {
 		return 0xffffff;
 	}
 
-	private hasComponent(eid: number, name: 'controller' | 'controlled'): boolean {
-		return !!this.world.getEntityByEid(eid)?.components[name];
-	}
-
 	private refreshStats() {
-		let stations = this.world.entities.filter(entity => this.hasComponent(entity.eid, 'controller'));
-		let ships = this.world.entities.filter(entity => this.hasComponent(entity.eid, 'controlled'));
+		const entities = entityList(this.world);
+		let stations = entities.filter(entity => !!entity.components.controller);
+		let ships = entities.filter(entity => !!entity.components.controlled);
 
 		this.stationShips.forEach(val => {
 			let matchingStation = stations.find(station => station.components.controller!.color === val.color);
@@ -472,7 +570,7 @@ export default class GameScene extends Phaser.Scene {
 			memory: prettyMemory(this.world.heap),
 			stationsCount: stations.length,
 			shipsCount: ships.length,
-			totalCount: this.world.entities.length,
+			totalCount: this.world.entities.size,
 			// Copy so the consumer can't mutate the scene's internal array.
 			stationShips: this.stationShips.map(stat => ({ ...stat })),
 		};

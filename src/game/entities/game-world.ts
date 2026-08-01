@@ -4,7 +4,8 @@ import type { Components, Config } from '../components';
 import type { Bounds } from '../systems/game-component-system';
 import { entityConfigs } from '@/data/entities';
 
-import { createPhysicsSystem } from '../systems/physics-system';
+import { createPhysicsSystem, type GamePhysicsSystem } from '../systems/physics-system';
+import { createInterpolationSystem } from '../systems/interpolation-system';
 import { createUpdateHealthTimersSystem } from '../systems/update-health-timers-system';
 import { createSpawnShipSystem } from '../systems/spawn-ship-system';
 import { createTargetEnemySystem } from '../systems/target-enemy-system';
@@ -26,6 +27,11 @@ export interface Scene {
 export default class GameWorld extends BaseWorld<typeof registry> {
 	bounds: Bounds = { width: 0, height: 0 };
 
+	// Held by name because the scene listens to it: physics reports each run's movement on the system rather
+	// than on the entities, so the thing drawing them has to be able to reach it.  Like every system here it
+	// lives for the world's lifetime, so this is safe to hand out for as long as the world is.
+	physicsSystem: GamePhysicsSystem;
+
 	constructor() {
 		super(registry, {
 			factory: new EntityFactory<Components, Config>(entityConfigs),
@@ -33,7 +39,7 @@ export default class GameWorld extends BaseWorld<typeof registry> {
 		// Systems live for the world's lifetime.  They subscribe to entity-added/-removed and BaseWorld#load only
 		// clears each system's entity list (not the systems themselves), so setting them up here is enough - load
 		// re-populates them by re-emitting entity-added for every entity in the scene.
-		this.initSystems();
+		this.physicsSystem = this.initSystems();
 	}
 
 	load(scene: Scene) {
@@ -43,13 +49,20 @@ export default class GameWorld extends BaseWorld<typeof registry> {
 		void this.init();
 	}
 
-	private initSystems() {
+	private initSystems(): GamePhysicsSystem {
 		this.addSystem(createUpdateHealthTimersSystem(this));
 		this.addSystem(createSpawnShipSystem(this));
 		// Physics takes the slot the collision system used to hold, so movement + collisions still run after the
 		// frame's spawns rather than before them: a ship exists for a frame before anything can run into it.
-		this.addSystem(createPhysicsSystem(this));
+		//
+		// Interpolation goes in immediately after it, so a step is drawn on the frame it landed on rather than the
+		// one after.  Nothing about the smoothness depends on that - it is paced by what has arrived in each
+		// entity's block - so it is worth one frame of latency and nothing more.
+		const physicsSystem = this.addSystem(createPhysicsSystem(this));
+		this.addSystem(createInterpolationSystem(this));
 		this.addSystem(createTargetEnemySystem(this));
 		this.addSystem(createMoveToTargetSystem(this));
+
+		return physicsSystem;
 	}
 }

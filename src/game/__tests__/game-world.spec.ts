@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import GameWorld from '../entities/game-world';
+import entityList from '../entities/entity-list';
 import { factionCollision } from '@/data/collide-categories';
 
 // Two distinct station colours.  Ships inherit their owning station's colour, and targeting only ever picks a
@@ -36,7 +37,7 @@ afterEach(() => {
 
 // Every ship (controlled) and station (controller) stays on screen.
 function everyEntityWithinBounds(gameWorld: GameWorld, tolerance: number): boolean {
-	return gameWorld.entities.every(entity => {
+	return entityList(gameWorld).every(entity => {
 		const transform = entity.components.transform;
 		if(!transform) {
 			return true;
@@ -68,7 +69,7 @@ describe('GameWorld game loop', () => {
 		}
 
 		// One ship a second over a minute of play, and nothing a ship can collide with exists, so none of them died.
-		const ships = world.entities.filter(entity => !!entity.components.controlled);
+		const ships = entityList(world).filter(entity => !!entity.components.controlled);
 		expect(ships.length).toBe(60);
 
 		// A ship can only ever overshoot a wall by a single frame of travel before the bounce turns it around.
@@ -94,7 +95,7 @@ describe('GameWorld game loop', () => {
 		}
 
 		// Only ships attack, so only ships carry the component the steer force lives on.
-		const steerForces = world.entities.filter(entity => !!entity.components.attack).map(entity => entity.components.attack!.steerForce);
+		const steerForces = entityList(world).filter(entity => !!entity.components.attack).map(entity => entity.components.attack!.steerForce);
 		expect(steerForces.length).toBe(20);
 
 		// Every roll lands inside the band the template asked for.  Crucially the floor is the template's own
@@ -122,7 +123,7 @@ describe('GameWorld game loop', () => {
 		await world.init();
 
 		const gameWorld = world;
-		const shipCount = () => gameWorld.entities.filter(entity => !!entity.components.controlled).length;
+		const shipCount = () => entityList(gameWorld).filter(entity => !!entity.components.controlled).length;
 
 		world.update(100);
 		expect(shipCount()).toBe(10);
@@ -148,7 +149,7 @@ describe('GameWorld game loop', () => {
 		await world.init();
 
 		const gameWorld = world;
-		const shipCount = () => gameWorld.entities.filter(entity => !!entity.components.controlled).length;
+		const shipCount = () => entityList(gameWorld).filter(entity => !!entity.components.controlled).length;
 
 		// 0.4s of a 1s interval per frame: nothing until the banked time crosses a whole ship, and the 0.2s left
 		// over then counts towards the next one rather than being thrown away - so the second ship arrives at 2s
@@ -179,7 +180,7 @@ describe('GameWorld game loop', () => {
 			world.update(250);
 		}
 
-		expect(world.entities.filter(entity => !!entity.components.controlled)).toHaveLength(0);
+		expect(entityList(world).filter(entity => !!entity.components.controlled)).toHaveLength(0);
 	});
 
 	it('destroys both ships and pays each owning station when evenly matched enemies collide', async () => {
@@ -193,8 +194,8 @@ describe('GameWorld game loop', () => {
 		});
 		await world.init();
 
-		const redStation = world.entities[0];
-		const blueStation = world.entities[1];
+		const redStation = entityList(world)[0];
+		const blueStation = entityList(world)[1];
 
 		// Two enemy ships dropped on the exact same spot: overlapping bodies in each other's collide mask means
 		// they collide every eligible frame, and since each is the other's nearest target the steering resolves to
@@ -231,8 +232,8 @@ describe('GameWorld game loop', () => {
 		});
 		await world.init();
 
-		const redStation = world.entities[0];
-		const blueStation = world.entities[1];
+		const redStation = entityList(world)[0];
+		const blueStation = entityList(world)[1];
 
 		// Same overlapping stand-off, but the red ship carries three shields to the blue ship's one, so red
 		// survives the exchange and blue is destroyed.
@@ -256,6 +257,61 @@ describe('GameWorld game loop', () => {
 	});
 });
 
+// Physics runs on a fixed 50ms step, so a ship's transform only changes on one frame in three.  What the sprites
+// are actually drawn from is the interpolation component, filled in every frame from the two positions physics
+// published either side of its last step - so these check the wiring rather than the blend itself, which
+// shared-memory-physics owns and tests.
+describe('GameWorld interpolation', () => {
+	async function loadOneShip(): Promise<{ gameWorld: GameWorld, ship: ReturnType<GameWorld['loadEntity']> }> {
+		const gameWorld = new GameWorld();
+		gameWorld.load({
+			bounds: { width: 400, height: 400 },
+			entities: [
+				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 0, x: 20, y: 20 },
+			],
+		});
+		await gameWorld.init();
+
+		const station = entityList(gameWorld)[0];
+		const ship = gameWorld.loadEntity({ type: 'ship', x: 200, y: 200, owner: station.eid, ...RED_FACTION, velocityX: 100, velocityY: 0 });
+
+		return { gameWorld, ship };
+	}
+
+	it('gives a ship a render position and a station none', async () => {
+		const { gameWorld, ship } = await loadOneShip();
+		world = gameWorld;
+
+		// A station has no velocity, so nothing ever moves it and there is nothing to smooth out - its sprite is
+		// drawn straight off the transform.
+		expect(entityList(gameWorld)[0].components.interpolation).toBeUndefined();
+		expect(ship.components.interpolation).toBeDefined();
+		// Seeded where it spawned rather than at the origin, so its first frame draws it in the right place.
+		expect(ship.components.interpolation!.x).toBe(200);
+	});
+
+	it('moves the render position on frames the transform does not move on', async () => {
+		const { gameWorld, ship } = await loadOneShip();
+		world = gameWorld;
+
+		// Half a step per frame, so physics runs on every other one.
+		const transforms: Array<number> = [];
+		const renders: Array<number> = [];
+		for(let i = 0; i < 12; i++) {
+			gameWorld.update(25);
+			transforms.push(ship.components.transform!.x);
+			renders.push(ship.components.interpolation!.x);
+		}
+
+		expect(new Set(renders).size).toBeGreaterThan(new Set(transforms).size);
+		// And never ahead of the simulation: every drawn position is one somewhere on a segment the ship really
+		// travelled, which is the whole guarantee of blending rather than guessing forward.
+		for(let i = 0; i < renders.length; i++) {
+			expect(renders[i]).toBeLessThanOrEqual(transforms[i]);
+		}
+	});
+});
+
 describe('GameWorld targeting', () => {
 	// The two stations every targeting test needs: one of each colour, with no spawn rate so no ship launches on
 	// its own and the only ships in the world are the ones the test placed.
@@ -275,8 +331,8 @@ describe('GameWorld targeting', () => {
 
 	it('picks the nearest enemy ship', async () => {
 		world = await loadTwoStations();
-		const redStation = world.entities[0];
-		const blueStation = world.entities[1];
+		const redStation = entityList(world)[0];
+		const blueStation = entityList(world)[1];
 
 		const hunter = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION });
 		const near = world.loadEntity({ type: 'ship', x: 240, y: 200, owner: blueStation.eid, ...BLUE_FACTION });
@@ -289,8 +345,8 @@ describe('GameWorld targeting', () => {
 
 	it('ignores a friendly ship sitting closer than the enemy', async () => {
 		world = await loadTwoStations();
-		const redStation = world.entities[0];
-		const blueStation = world.entities[1];
+		const redStation = entityList(world)[0];
+		const blueStation = entityList(world)[1];
 
 		const hunter = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION });
 		// Its own colour, and half the distance away - so a target picked on distance alone would be this one.
@@ -314,8 +370,8 @@ describe('GameWorld targeting', () => {
 		});
 		await world.init();
 
-		const redStation = world.entities[0];
-		const nearerBlueStation = world.entities[2];
+		const redStation = entityList(world)[0];
+		const nearerBlueStation = entityList(world)[2];
 
 		// Both blue stations are well past the range a ship searches for enemies in, so this is the fallback
 		// picking between them rather than the search finding one.
@@ -336,7 +392,7 @@ describe('GameWorld targeting', () => {
 		});
 		await world.init();
 
-		const station = world.entities[0];
+		const station = entityList(world)[0];
 		const hunter = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: station.eid, ...RED_FACTION });
 		world.loadEntity({ type: 'ship', x: 210, y: 200, owner: station.eid, ...RED_FACTION });
 
@@ -358,7 +414,7 @@ describe('GameWorld collision filtering', () => {
 		});
 		await world.init();
 
-		const station = world.entities[0];
+		const station = entityList(world)[0];
 		// Overlapping exactly, as in the fights above - but both fly for the same faction, so neither one's mask
 		// accepts the other's category and the physics broadphase never reports the pair at all.
 		const first = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: station.eid, ...RED_FACTION, maxShields: 3, timeToRegenerateShields: 1000 });
@@ -388,8 +444,8 @@ describe('GameWorld collision filtering', () => {
 		});
 		await world.init();
 
-		const redStation = world.entities[0];
-		const blueStation = world.entities[1];
+		const redStation = entityList(world)[0];
+		const blueStation = entityList(world)[1];
 
 		// A ship of the blue fleet, parked away from the fight: it dies with its station rather than to a collision.
 		const blueShip = world.loadEntity({ type: 'ship', x: 350, y: 350, owner: blueStation.eid, ...BLUE_FACTION, maxShields: 3, timeToRegenerateShields: 1000 });

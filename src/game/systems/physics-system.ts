@@ -8,8 +8,12 @@ import PhysicsWorker from './physics.worker?worker';
 
 // The library's PhysicsSystem, with this game's `bounds` added to the per-run data object the same way
 // GameComponentSystem does it - physicsUpdate needs them to bounce ships off the edge of the map.
-class GamePhysicsSystem extends PhysicsSystem<Components, GamePhysicsComponents, CustomSystemWorld> {
+export class GamePhysicsSystem extends PhysicsSystem<Components, GamePhysicsComponents, CustomSystemWorld> {
 	addDataToWorld(world: CustomSystemWorld): void {
+		// The library's own version stamps the run with its step number, which every interpolation block is
+		// published under - so this is an addition to what it does, not a replacement for it.
+		super.addDataToWorld(world);
+
 		world.bounds = readBounds(this.world);
 	}
 }
@@ -17,7 +21,7 @@ class GamePhysicsSystem extends PhysicsSystem<Components, GamePhysicsComponents,
 // Move every ship, keep it on the map, and resolve the collisions, damage, deaths and bounties that come out of
 // where it ends up.  This one system replaces the separate velocity + collision systems this game used to run:
 // collisions are found as each ship moves, against the position it actually moved to.
-export function createPhysicsSystem(world: BaseWorld<typeof registry>) {
+export function createPhysicsSystem(world: BaseWorld<typeof registry>): GamePhysicsSystem {
 	return new GamePhysicsSystem(world, {
 		name: 'physicsSystem',
 		// The same update the worker file hands to createComponentWorker, so both backends behave identically.  It

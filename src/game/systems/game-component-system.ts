@@ -1,5 +1,6 @@
 import { ComponentSystem } from '@daneren2005/shared-memory-ecs';
-import type { ComponentSystemWorld, EntityUpdateComponents } from '@daneren2005/shared-memory-ecs';
+import type { EntityUpdateComponents } from '@daneren2005/shared-memory-ecs';
+import type { PhysicsWorld } from '@daneren2005/shared-memory-physics';
 import type { Components } from '../components';
 
 export interface Bounds {
@@ -7,7 +8,10 @@ export interface Bounds {
 	height: number
 }
 
-export interface CustomSystemWorld extends ComponentSystemWorld {
+// Built on PhysicsWorld rather than the bare ComponentSystemWorld so that one shape covers every system in the
+// game: `tick` is what PhysicsSystem stamps each run with for the interpolation blocks, and the systems that
+// are not physics simply never read it.  One world type is worth more than the four bytes it costs them.
+export interface CustomSystemWorld extends PhysicsWorld {
 	bounds: Bounds
 }
 

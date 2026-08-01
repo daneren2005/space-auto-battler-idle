@@ -18,7 +18,7 @@ const HEIGHT = 900;
 const MARGIN = 200;
 // How fast each faction launches ships.  Nothing caps the fleet any more, so this is the whole dial: the ship
 // count climbs at FACTIONS x this per second minus however many are dying, until the frame rate gives out.
-const SHIPS_PER_SECOND_PER_FACTION = 100;
+const SHIPS_PER_SECOND_PER_FACTION = 150;
 
 // One faction per palette colour, so a colour added to (or removed from) data/colors.ts changes the size of the
 // stress test with it.  factionCollision caps out at MAX_FACTIONS (32), well above the palette.

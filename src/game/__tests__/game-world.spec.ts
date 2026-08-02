@@ -255,6 +255,26 @@ describe('GameWorld game loop', () => {
 		// Red traded two of its three shields (one per exchange) to land the kill.
 		expect(survivor!.components.health!.shields).toBe(1);
 	});
+
+	it('gives a ship the bounciness that turns it around on contact, and a station none', async () => {
+		// The bounce is native now: a ship carries a bounciness of 1, so physics reflects its velocity off
+		// whatever it hits with no code in the collision callback for it.  A station never moves, so it has no
+		// bounciness block at all - the whole reason bounciness is its own component rather than part of the body.
+		world = new GameWorld();
+		world.load({
+			bounds: { width: 400, height: 400 },
+			entities: [
+				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 0, x: 200, y: 200 },
+			],
+		});
+		await world.init();
+
+		const station = entityList(world)[0];
+		const ship = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: station.eid, ...RED_FACTION });
+
+		expect(ship.components.bounciness!.bounciness).toBe(1);
+		expect(station.components.bounciness).toBeUndefined();
+	});
 });
 
 // Physics runs on a fixed 50ms step, so a ship's transform only changes on one frame in three.  What the sprites

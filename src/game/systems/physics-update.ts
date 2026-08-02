@@ -52,8 +52,10 @@ interface CollidableBlocks {
 let blocksByEid: Record<number, CollidableBlocks> = {};
 let shipsByStation: Record<number, Array<number>> = {};
 // The entities that have already collided this run.  The physics broadphase reports every entity a ship has
-// ended up overlapping, but a ship only ever bounces off (and trades a hit with) the first of them: bouncing
-// twice in one run would flip its velocity straight back and leave it flying on into whatever it hit.
+// ended up overlapping, but a ship only ever trades a hit - and re-faces along its new heading - with the first
+// of them, so the damage is dealt once per run rather than once per enemy it happens to be touching.  The bounce
+// itself is native now (the ship's bounciness), and physics already guards against reflecting a velocity that is
+// on its way back out, so this set is only about the game's own once-per-run response.
 let collidedThisRun = new Set<number>();
 
 // Movement, walls and collisions for every ship in the game.  shared-memory-physics owns the first and last of
@@ -134,10 +136,11 @@ function bounceOffWalls(world: CustomSystemWorld, components: GamePhysicsCompone
 	}
 }
 
-// One ship has run into an enemy.  Both sides take a point of shield damage, the killer's faction earns the
-// kill reward, a dead station takes its whole fleet with it, and the ship bounces away from whatever it hit.
-// A death costs the losing faction nothing beyond the ship: stations spawn on a timer rather than out of a
-// bank of slots, so there is nothing for a dead ship to hand back.
+// One ship has run into an enemy.  The bounce is native - the ship carries a bounciness of 1, so physics has
+// already reflected its velocity off `other` by the time this runs - so all that is left to the game is to
+// re-face the ship along its new heading, deal a point of shield damage each way, hand the killer's faction the
+// kill reward, and take a dead station's whole fleet down with it.  A death costs the losing faction nothing
+// beyond the ship: stations spawn on a timer rather than out of a bank of slots, so there is nothing to hand back.
 //
 // Called for the entity that *moved*, so `self` is always a ship (nothing else has a velocity) and `other` is
 // the ship or station it landed on.  Two enemy ships that run into each other each get their own call with the
@@ -154,9 +157,9 @@ function collide(
 	}
 	collidedThisRun.add(self.entityId);
 
+	// Physics reflected the velocity for us; the ship's sprite faces along its heading, so re-face it to match
+	// where the bounce is now sending it.
 	const velocity = self.components.velocity;
-	velocity[VELOCITY_X_INDEX] = -velocity[VELOCITY_X_INDEX];
-	velocity[VELOCITY_Y_INDEX] = -velocity[VELOCITY_Y_INDEX];
 	self.components.transform[TRANSFORM_ANGLE_INDEX] = computeAngle(velocity[VELOCITY_X_INDEX], velocity[VELOCITY_Y_INDEX]);
 
 	exchangeDamage(self, other, callbacks);

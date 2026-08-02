@@ -10,7 +10,11 @@ import type { Config } from '@/game/components';
 // heading, and one placed directly (a test, a scripted encounter) still starts out able to move.
 // `interpolate` gives it a render position: physics runs on a 50ms step, so without one a ship's sprite would
 // only move on one frame in three.
+//
+// `bounciness` of 1 is what makes a ship rebound off whatever it runs into with no speed lost: physics reflects
+// its velocity about the contact normal on collision, so the bounce is native rather than something the physics
+// update writes by hand.  Stations never move, so only ships carry it.
 export const shipConfig: Config = {
 	type: 'ship', width: 10, height: 5, maxShields: 0, timeToRegenerateShields: 1, damageCooldown: 0.2,
-	velocityX: 0, speed: 100, attacks: true, steerForce: 10, steerForceBonus: 0.5, interpolate: true,
+	velocityX: 0, speed: 100, attacks: true, steerForce: 10, steerForceBonus: 0.5, interpolate: true, bounciness: 1,
 };

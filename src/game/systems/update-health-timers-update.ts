@@ -1,5 +1,6 @@
 import type { EntityUpdateFunction } from '@daneren2005/shared-memory-ecs';
-import { addAtomicFloat32, loadFloat32 } from '@daneren2005/shared-memory-objects';
+import { addAtomicFloat32 } from '@daneren2005/shared-memory-objects/utils/atomic-math';
+import { loadFloat32 } from '@daneren2005/shared-memory-objects/utils/float32-atomics';
 import type { Components, ComponentArrays } from '../components';
 import {
 	HEALTH_SHIELDS, HEALTH_MAX_SHIELDS, HEALTH_TIME_TO_REGEN, HEALTH_TIME_SINCE_REGEN, HEALTH_TIME_SINCE_DAMAGE,

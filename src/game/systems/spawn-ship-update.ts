@@ -1,4 +1,4 @@
-import { createEntityWorker } from '@daneren2005/shared-memory-ecs';
+import { createEntityWorker } from '@daneren2005/shared-memory-ecs/worker';
 import type { EntityUpdateFunction } from '@daneren2005/shared-memory-ecs';
 import { TRANSFORM_X_INDEX, TRANSFORM_Y_INDEX, BODY_CATEGORY_INDEX, BODY_MASK_INDEX } from '@daneren2005/shared-memory-physics';
 import type { Components, ComponentArrays } from '../components';

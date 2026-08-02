@@ -1,4 +1,4 @@
-import { createComponentWorker } from '@daneren2005/shared-memory-ecs';
+import { createComponentWorker } from '@daneren2005/shared-memory-ecs/worker';
 import { physicsUpdate } from './physics-update';
 
 // The worker movement + collision detection runs on.  The collision callback reaches this thread by riding

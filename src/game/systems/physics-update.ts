@@ -1,5 +1,6 @@
-import { killEntityWorker, DEAD_INDEX } from '@daneren2005/shared-memory-ecs';
-import { loadFloat32, storeFloat32, subtractAtomicFloat } from '@daneren2005/shared-memory-objects';
+import { killEntityWorker, DEAD_INDEX } from '@daneren2005/shared-memory-ecs/worker';
+import { subtractAtomicFloat } from '@daneren2005/shared-memory-objects/utils/atomic-math';
+import { loadFloat32, storeFloat32 } from '@daneren2005/shared-memory-objects/utils/float32-atomics';
 import {
 	createPhysicsUpdate,
 	COLLIDABLE_QUERY,

@@ -2,8 +2,12 @@ import type { ComponentsOf, EntityConfigOf } from '@daneren2005/shared-memory-ec
 import { physicsRegistry } from '@daneren2005/shared-memory-physics';
 import { healthDefinition } from './health';
 import { controllerDefinition } from './controller';
+import { hangarDefinition } from './hangar';
 import { controlledDefinition } from './controlled';
 import { attackDefinition } from './attack';
+import { combatDefinition } from './combat';
+import { weaponDefinition } from './weapon';
+import { projectileDefinition } from './projectile';
 
 // One place declares every component; the world derives its typed component map + flat entity config from it.
 // `transform` (where/how big/facing), `velocity` and `body` (what shape, what it collides with) all come from
@@ -13,8 +17,12 @@ export const registry = {
 	...physicsRegistry,
 	health: healthDefinition,
 	controller: controllerDefinition,
+	hangar: hangarDefinition,
 	controlled: controlledDefinition,
 	attack: attackDefinition,
+	combat: combatDefinition,
+	weapon: weaponDefinition,
+	projectile: projectileDefinition,
 };
 
 export type Components = ComponentsOf<typeof registry>;

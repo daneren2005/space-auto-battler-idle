@@ -16,12 +16,12 @@ describe('stress test level', () => {
 		});
 	});
 
-	it('gives every faction the same punishing spawn rate', () => {
+	it('gives every faction the same punishing Skiff line', () => {
 		// The point of the level is the entity count, so this only guards the floor - raise
 		// SHIPS_PER_SECOND_PER_FACTION freely.
 		expect(SHIPS_PER_SECOND_PER_FACTION).toBeGreaterThanOrEqual(100);
 		stressTestLevel.entities.forEach(station => {
-			expect(station.shipsPerSecond).toBe(SHIPS_PER_SECOND_PER_FACTION);
+			expect(station.ships).toEqual({ skiff: { rate: SHIPS_PER_SECOND_PER_FACTION, level: 2 } });
 		});
 	});
 

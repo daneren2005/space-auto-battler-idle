@@ -3,8 +3,9 @@ import type { Bounds } from '@/game/systems/game-component-system';
 
 // A hand-authored level.  Each level lives in its own file (level-1.ts, ...) so they can be tracked and
 // balanced individually, and is loaded into the world as a Scene (`{ entities, bounds }`).  `entities` are
-// full entity configs with explicit positions; a station entity additionally carries `color`, `player` and
-// its starting `shipsPerSecond`.  `nextLevel` names the level to advance to on a win, if any.
+// full entity configs with explicit positions; a station entity additionally carries `color`, `player` and its
+// `ships` roster (the per-type production lines it builds).  `nextLevel` names the level to advance to on a win,
+// if any.
 export interface LevelConfig {
 	name: string
 	title: string

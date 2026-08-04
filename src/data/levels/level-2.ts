@@ -1,4 +1,5 @@
 import type { LevelConfig } from './types';
+import type { Config } from '@/game/components';
 import { PLAYER_COLOR, ENEMY_COLOR } from '@/data/colors';
 import { factionCollision } from '@/data/collide-categories';
 
@@ -8,11 +9,12 @@ const WIDTH = 360;
 const HEIGHT = 640;
 const MARGIN = 80;
 
-// The second level ups the baseline: both factions launch 3 ships a second and their ships carry 1 shield, so
-// fights are bigger and ships tankier than level 1's one-hit skirmishes.  The player holds the bottom edge and
-// the enemy the top, both horizontally centred.  The player also brings whatever ship-rate / shield upgrades
-// they bought in level 1 (applied on top of these bases by the scene), so it should be beatable with a decently
-// upgraded fleet but a fresh, un-upgraded run would be an even coin-flip.
+// The second level ups the baseline: both factions build a Skiff line at 3 ships a second, level 2 - one shield
+// apiece (a Skiff gains a shield per level over its shieldless base) - so fights are bigger and ships tankier than
+// level 1's one-hit skirmishes.  The player holds the bottom edge and the enemy the top, both horizontally
+// centred.  The player also brings whatever ship-rate / level upgrades they bought in level 1 (applied on top of
+// these bases by the scene), so it should be beatable with a decently upgraded fleet but a fresh, un-upgraded run
+// would be an even coin-flip.
 export const level2: LevelConfig = {
 	name: 'level-2',
 	title: 'Escalation',
@@ -25,17 +27,15 @@ export const level2: LevelConfig = {
 			color: PLAYER_COLOR,
 			...factionCollision(0),
 			player: true,
-			shipsPerSecond: 3,
-			shipShields: 1,
-		},
+			ships: { skiff: { rate: 3, level: 2 } },
+		} satisfies Config,
 		{
 			type: 'station',
 			x: WIDTH / 2,
 			y: MARGIN,
 			color: ENEMY_COLOR,
 			...factionCollision(1),
-			shipsPerSecond: 3,
-			shipShields: 1,
-		},
+			ships: { skiff: { rate: 3, level: 2 } },
+		} satisfies Config,
 	],
 };

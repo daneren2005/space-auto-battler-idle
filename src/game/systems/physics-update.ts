@@ -6,9 +6,13 @@ import {
 	COLLIDABLE_QUERY,
 	TRANSFORM_X_INDEX,
 	TRANSFORM_Y_INDEX,
+	TRANSFORM_WIDTH_INDEX,
+	TRANSFORM_HEIGHT_INDEX,
 	TRANSFORM_ANGLE_INDEX,
 	VELOCITY_X_INDEX,
 	VELOCITY_Y_INDEX,
+	BODY_CATEGORY_INDEX,
+	BODY_MASK_INDEX,
 } from '@daneren2005/shared-memory-physics';
 import type {
 	CollisionEntity,
@@ -23,6 +27,7 @@ import computeAngle from '@/math/compute-angle';
 import { HEALTH_SHIELDS, HEALTH_TIME_SINCE_DAMAGE, HEALTH_DAMAGE_COOLDOWN } from '../components/health';
 import { CONTROLLER_MONEY } from '../components/controller';
 import { CONTROLLED_OWNER } from '../components/controlled';
+import { COMBAT_CONTACT_DAMAGE, COMBAT_BLAST_RADIUS } from '../components/combat';
 
 // The blocks this update hands its collision callback: the transform + velocity physics moves, the body it
 // filters on, and the four game components a collision reads or writes.  Everything past the transform is
@@ -33,6 +38,8 @@ export type GamePhysicsComponents = PhysicsUpdateComponents & {
 	entity?: Uint32Array
 	controller?: Int32Array
 	controlled?: Uint32Array
+	combat?: Float32Array
+	projectile?: Float32Array
 };
 
 // Either side of a collision, which is all the damage / bounty code below needs of one: it works off the blocks
@@ -44,13 +51,20 @@ type Combatant = MovingEntity<GamePhysicsComponents> | CollisionEntity<GamePhysi
 // one to overwrite them.
 //
 // Only the entities a collision has to reach *past* the two in front of it are here: a station's fleet, so a
-// destroyed station takes its ships with it, and every entity's blocks by eid so a kill reward can be paid to
-// a station neither side of the collision is.
+// destroyed station takes its ships with it, and every entity's blocks by eid so a kill reward can be paid to a
+// station neither side of the collision is - and, for a detonator, so the blast can find and damage every enemy
+// standing near the point of contact, none of which is the entity it actually ran into.
 interface CollidableBlocks {
 	entity?: Uint32Array
 	controller?: Int32Array
+	controlled?: Uint32Array
+	transform?: Float32Array
+	health?: Float32Array
+	body?: Uint32Array
 }
 let blocksByEid: Record<number, CollidableBlocks> = {};
+// Every collidable entity's eid, so a detonation can sweep them for who is inside its blast radius.
+let collidableEids: Array<number> = [];
 let shipsByStation: Record<number, Array<number>> = {};
 // The entities that have already collided this run.  The physics broadphase reports every entity a ship has
 // ended up overlapping, but a ship only ever trades a hit - and re-faces along its new heading - with the first
@@ -66,7 +80,7 @@ let collidedThisRun = new Set<number>();
 // not have to check colours the way the old collision system did.
 const physics = createPhysicsUpdate<Components, GamePhysicsComponents, CustomSystemWorld>({
 	// The game blocks that travel to the worker alongside the transform, for both sides of a collision.
-	optional: ['health', 'entity', 'controller', 'controlled'],
+	optional: ['health', 'entity', 'controller', 'controlled', 'combat', 'projectile'],
 	onCollision: collide,
 });
 
@@ -76,7 +90,11 @@ const physics = createPhysicsUpdate<Components, GamePhysicsComponents, CustomSys
 export const physicsUpdate: PhysicsUpdateFunction<Components, GamePhysicsComponents, CustomSystemWorld> = Object.assign(
 	(world: CustomSystemWorld, entityId: number, components: GamePhysicsComponents, queries: EntityQueryComponents<Components>, callbacks: ComponentSystemCallbacks<Components>) => {
 		physics(world, entityId, components, queries, callbacks);
-		bounceOffWalls(world, components);
+		// Ships are kept on the map by bouncing off its edges; a projectile instead just flies off and expires on
+		// its lifetime (see update-projectiles), so it is left to leave rather than rattling around inside.
+		if(!components.projectile) {
+			bounceOffWalls(world, components);
+		}
 	},
 	{
 		// What PhysicsSystem reads off the update to set up the same components and queries it expects.  Passed
@@ -94,6 +112,7 @@ export const physicsUpdate: PhysicsUpdateFunction<Components, GamePhysicsCompone
 			physics.preRun?.(world, entities, queries, callbacks);
 
 			blocksByEid = {};
+			collidableEids = [];
 			shipsByStation = {};
 			collidedThisRun = new Set();
 			for(const entity of queries[COLLIDABLE_QUERY] ?? []) {
@@ -104,10 +123,17 @@ export const physicsUpdate: PhysicsUpdateFunction<Components, GamePhysicsCompone
 				blocksByEid[entity.entityId] = {
 					entity: components.entity,
 					controller: components.controller,
+					controlled: components.controlled,
+					transform: components.transform,
+					health: components.health,
+					body: components.body,
 				};
+				collidableEids.push(entity.entityId);
 
+				// A projectile is `controlled` too (its owner pays for its kills), but it is not part of a station's
+				// fleet - so it neither dies when that station falls nor counts toward the station's kill worth.
 				const controlled = components.controlled;
-				if(controlled) {
+				if(controlled && !components.projectile) {
 					const owner = controlled[CONTROLLED_OWNER];
 					(shipsByStation[owner] ?? (shipsByStation[owner] = [])).push(entity.entityId);
 				}
@@ -143,9 +169,9 @@ function bounceOffWalls(world: CustomSystemWorld, components: GamePhysicsCompone
 // kill reward, and take a dead station's whole fleet down with it.  A death costs the losing faction nothing
 // beyond the ship: stations spawn on a timer rather than out of a bank of slots, so there is nothing to hand back.
 //
-// Called for the entity that *moved*, so `self` is always a ship (nothing else has a velocity) and `other` is
-// the ship or station it landed on.  Two enemy ships that run into each other each get their own call with the
-// roles swapped, which is what lets this act on `self` and leave the other side to its own call.
+// Called for the entity that *moved*, so `self` is always a ship or a projectile (nothing else has a velocity)
+// and `other` is whatever it landed on.  Two enemy ships that run into each other each get their own call with
+// the roles swapped, which is what lets this act on `self` and leave the other side to its own call.
 function collide(
 	world: CustomSystemWorld,
 	self: MovingEntity<GamePhysicsComponents>,
@@ -156,7 +182,32 @@ function collide(
 	if(collidedThisRun.has(self.entityId)) {
 		return;
 	}
+
+	// A projectile is a sensor: it also shows up as an overlap on the ship that ran into it, but the hit is only
+	// ever resolved from the projectile's own side, so a ship colliding with an enemy shot leaves it alone here.
+	// Two projectiles pass straight through each other.
+	if(other.components.projectile) {
+		return;
+	}
+
 	collidedThisRun.add(self.entityId);
+
+	if(self.components.projectile) {
+		projectileHit(self, other, callbacks);
+		return;
+	}
+
+	// A detonator explodes on contact, dealing its damage to every enemy within a blast radius rather than trading
+	// a single hit, and dies - so it resolves the whole collision from its own side.
+	if(isDetonator(self)) {
+		detonate(self, callbacks);
+		return;
+	}
+	// The other side of a detonation: like a projectile, leave a detonator to its own call, so a ship that runs
+	// into one neither rams it nor takes its blast twice.
+	if(isDetonator(other)) {
+		return;
+	}
 
 	// Physics reflected the velocity for us; the ship's sprite faces along its heading, so re-face it to match
 	// where the bounce is now sending it.
@@ -164,6 +215,116 @@ function collide(
 	self.components.transform[TRANSFORM_ANGLE_INDEX] = computeAngle(velocity[VELOCITY_X_INDEX], velocity[VELOCITY_Y_INDEX]);
 
 	exchangeDamage(self, other, callbacks);
+}
+
+// A projectile has reached an enemy.  Unlike a ram it is one-sided: the shot deals its damage to whatever it
+// hit, pays its owner if that was a kill (a station is still worth its whole fleet), and is then consumed - it
+// takes no damage back and does not bounce (it is a sensor).  If the target is mid damage-cooldown the shot
+// passes through untouched and may connect on a later frame instead.
+function projectileHit(self: MovingEntity<GamePhysicsComponents>, other: CollisionEntity<GamePhysicsComponents>, callbacks: ComponentSystemCallbacks<Components>) {
+	if(!canTakeDamage(other)) {
+		return;
+	}
+
+	const otherWorth = other.components.controller ? shipsByStation[other.entityId]?.length ?? 0 : 1;
+	takeDamage(other, contactDamageOf(self), callbacks);
+	if(isDead(other)) {
+		creditMoney(ownerOf(self), otherWorth);
+	}
+
+	kill(self.entityId, self.components.entity, callbacks);
+}
+
+// Whether a combatant explodes on contact rather than ramming: its combat block carries a blast radius.
+function isDetonator(combatant: Combatant): boolean {
+	const combat = combatant.components.combat;
+	return !!combat && combat[COMBAT_BLAST_RADIUS] > 0;
+}
+
+// A detonator has reached an enemy and goes off.  Unlike a ram, the hit reaches past the entity it ran into: it
+// deals its contact damage to every enemy standing within `blastRadius` of the point of contact - each is worth
+// its usual reward to the detonator's faction on a kill - and then the detonator itself is destroyed.  It takes
+// nothing back and does not bounce; the collision is spent entirely here.
+function detonate(self: MovingEntity<GamePhysicsComponents>, callbacks: ComponentSystemCallbacks<Components>) {
+	const combat = self.components.combat;
+	const body = self.components.body;
+	const transform = self.components.transform;
+	// combat + body are what marked it a detonator, but guard anyway - without them it simply dies on contact.
+	if(combat && body) {
+		const radius = combat[COMBAT_BLAST_RADIUS];
+		const damage = combat[COMBAT_CONTACT_DAMAGE];
+		const mask = body[BODY_MASK_INDEX];
+		const sx = transform[TRANSFORM_X_INDEX];
+		const sy = transform[TRANSFORM_Y_INDEX];
+		const attackerOwner = ownerOf(self);
+
+		for(const eid of collidableEids) {
+			if(eid === self.entityId) {
+				continue;
+			}
+
+			const blocks = blocksByEid[eid];
+			const otherBody = blocks?.body;
+			const otherTransform = blocks?.transform;
+			if(!blocks?.health || !otherBody || !otherTransform) {
+				continue;
+			}
+			// Only enemies the detonator could collide with are caught in the blast; friendlies share its collide
+			// category, which its mask excludes, so they pass through it unharmed.
+			if((mask & otherBody[BODY_CATEGORY_INDEX]) === 0) {
+				continue;
+			}
+
+			// Measured to the target's hull, as the blast reaching its near edge is enough to catch it.
+			const half = Math.max(otherTransform[TRANSFORM_WIDTH_INDEX], otherTransform[TRANSFORM_HEIGHT_INDEX]) / 2;
+			const dx = otherTransform[TRANSFORM_X_INDEX] - sx;
+			const dy = otherTransform[TRANSFORM_Y_INDEX] - sy;
+			const reach = radius + half;
+			if(dx * dx + dy * dy > reach * reach) {
+				continue;
+			}
+
+			// A station is worth its whole fleet, a ship worth one - counted before the hit, while that fleet is alive.
+			const worth = blocks.controller ? shipsByStation[eid]?.length ?? 0 : 1;
+			if(damageEid(eid, damage, callbacks)) {
+				creditMoney(attackerOwner, worth);
+			}
+		}
+	}
+
+	kill(self.entityId, self.components.entity, callbacks);
+}
+
+// Applies damage to a collidable by eid rather than to a collision Combatant, for the detonator's blast - which
+// reaches entities that are not either side of the collision physics reported.  Mirrors takeDamage + its
+// damage-cooldown gate + the destroyed-station-takes-its-fleet rule, off the blocks gathered in preRun; returns
+// whether the hit was fatal so the caller can pay the bounty.
+function damageEid(eid: number, damage: number, callbacks: ComponentSystemCallbacks<Components>): boolean {
+	const blocks = blocksByEid[eid];
+	const health = blocks?.health;
+	if(!health) {
+		return false;
+	}
+
+	// Same gate as canTakeDamage: a target still inside its damage cooldown shrugs the blast off.
+	if(loadFloat32(health, HEALTH_TIME_SINCE_DAMAGE) < health[HEALTH_DAMAGE_COOLDOWN]) {
+		return false;
+	}
+
+	const remainingShields = subtractAtomicFloat(health, HEALTH_SHIELDS, damage, -Infinity);
+	storeFloat32(health, HEALTH_TIME_SINCE_DAMAGE, 0);
+	if(remainingShields >= 0) {
+		return false;
+	}
+
+	kill(eid, blocks.entity, callbacks);
+	// A destroyed station takes its whole fleet down with it.
+	if(blocks.controller) {
+		for(const shipEid of shipsByStation[eid] ?? []) {
+			kill(shipEid, blocksByEid[shipEid]?.entity, callbacks);
+		}
+	}
+	return true;
 }
 
 function exchangeDamage(self: Combatant, other: Combatant, callbacks: ComponentSystemCallbacks<Components>) {
@@ -175,8 +336,10 @@ function exchangeDamage(self: Combatant, other: Combatant, callbacks: ComponentS
 	// while that fleet is still alive.
 	const otherWorth = other.components.controller ? shipsByStation[other.entityId]?.length ?? 0 : 1;
 
-	takeDamage(self, 1, callbacks);
-	takeDamage(other, 1, callbacks);
+	// Each side removes its own contact damage from the other; a combatant with no combat block (a station) falls
+	// back to one, which is what the ram used to deal flat.
+	takeDamage(self, contactDamageOf(other), callbacks);
+	takeDamage(other, contactDamageOf(self), callbacks);
 
 	if(isDead(other)) {
 		// self got the kill, so its faction earns the reward.
@@ -222,6 +385,13 @@ function kill(entityId: number, entity: Uint32Array | undefined, callbacks: Comp
 	// killEntityWorker only needs the entity block to flag it dead; it reports the death back so the main
 	// thread runs the same cleanup killEntity would.
 	killEntityWorker(entityId, { entity }, callbacks);
+}
+
+// How much damage a combatant deals on contact: its combat block's contactDamage, or one for anything without a
+// combat block (a station, which never rams but can be rammed) so a hit still lands the way it always did.
+function contactDamageOf(combatant: Combatant): number {
+	const combat = combatant.components.combat;
+	return combat ? combat[COMBAT_CONTACT_DAMAGE] : 1;
 }
 
 // The faction (station eid) an entity belongs to: a station is its own faction, a ship's is its owner.

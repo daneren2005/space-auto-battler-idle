@@ -4,7 +4,7 @@ import type { Components, ComponentArrays } from '../components';
 import euclideanDistance from '@/math/euclidean-distance';
 import { CONTROLLER_COLOR } from '../components/controller';
 import { CONTROLLED_OWNER } from '../components/controlled';
-import { ATTACK_TARGET } from '../components/attack';
+import { ATTACK_TARGET, ATTACK_SEARCH_RANGE } from '../components/attack';
 
 // A station as the fallback needs it: where it is and whose it is.  Stations are few and every ship that has
 // found nothing nearby looks at all of them, so this is a plain list rather than another index.
@@ -20,9 +20,6 @@ type Scratch = ComponentSystemWorld & {
 	colorByEid?: Record<number, number>
 	stations?: Array<StationDatum>
 };
-
-// How far past its own hull a ship looks for an enemy.
-const SEARCH_RANGE = 150;
 
 // Assigns each ship a target: the nearest enemy (different colour) within search range, falling back to the
 // nearest enemy station so idle ships always have somewhere to go.  Two library queries feed it: `collidable`
@@ -41,8 +38,9 @@ export const targetEnemyUpdate: EntityUpdateFunction<Components, Pick<ComponentA
 	const x = transform[TRANSFORM_X_INDEX];
 	const y = transform[TRANSFORM_Y_INDEX];
 	// The index measures to an enemy's hull rather than to its centre, so the range only has to allow for this
-	// ship's own half - the other side is already accounted for.
-	const reach = Math.max(transform[TRANSFORM_WIDTH_INDEX], transform[TRANSFORM_HEIGHT_INDEX]) / 2 + SEARCH_RANGE;
+	// ship's own half - the other side is already accounted for.  Each ship carries its own search range, so a
+	// long-range type can acquire targets as far out as it can shoot.
+	const reach = Math.max(transform[TRANSFORM_WIDTH_INDEX], transform[TRANSFORM_HEIGHT_INDEX]) / 2 + attack[ATTACK_SEARCH_RANGE];
 
 	// One walk of the tree in distance order: it settles on the nearest enemy without measuring anything past it.
 	const nearest = scratch.spatialIndex.findNearest(x, y, reach, other => {

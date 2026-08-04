@@ -10,7 +10,8 @@ describe('generateScene', () => {
 
 		scene.entities.forEach(entity => {
 			expect(entity.type).toBe('station');
-			expect(entity.shipsPerSecond).toBe(20);
+			// Each station builds a Skiff line at the requested rate.
+			expect(entity.ships).toEqual({ skiff: { rate: 20, level: 1 } });
 			expect(entity.x).toBeGreaterThanOrEqual(0);
 			expect(entity.x).toBeLessThanOrEqual(800);
 			expect(entity.y).toBeGreaterThanOrEqual(0);

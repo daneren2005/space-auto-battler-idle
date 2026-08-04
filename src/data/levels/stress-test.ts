@@ -9,8 +9,11 @@ import { factionCollision } from '@/data/collide-categories';
 // of `levels` (data/levels/index.ts) - it has no place in the play order, it never advances anywhere, and the
 // campaign's shape (a portrait field with exactly two stations) does not apply to it.  It is reached by opening
 // the /stress-test page, which boots it on a landscape canvas; see src/stress-test.ts.
-const WIDTH = 2400;
-const HEIGHT = 900;
+// Sized to the wide canvas's play-area aspect (its landscape strip is more elongated than the level's own two
+// rows), so the camera's fit-to-bounds zoom fills the strip almost edge to edge instead of letterboxing the
+// level with dead space either side.
+const WIDTH = 1800;
+const HEIGHT = 700;
 // Far enough in from the edges that a station never sits on the boundary its own ships bounce off.  It is also
 // what sets how far apart the two rows are: at this margin they end up the same distance apart as the stations
 // within a row, so every faction is equally close to its neighbours either side and the one opposite, and the
@@ -53,10 +56,10 @@ export const stressTestLevel: LevelConfig = {
 			color,
 			...factionCollision(faction),
 			player: faction === 0,
-			shipsPerSecond: SHIPS_PER_SECOND_PER_FACTION,
-			// A shield apiece so ships survive their first hit and the fight stays crowded instead of thinning out
-			// the moment the fleets meet.
-			shipShields: 1,
+			// Every faction pours out the same Skiff line at the punishing rate.  Level 2 gives each Skiff a shield
+			// (one per level over its shieldless base), so ships survive their first hit and the fight stays crowded
+			// instead of thinning out the moment the fleets meet.
+			ships: { skiff: { rate: SHIPS_PER_SECOND_PER_FACTION, level: 2 } },
 		};
 	}),
 };

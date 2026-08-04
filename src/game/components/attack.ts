@@ -18,29 +18,41 @@ import type { ComponentDefinition } from '@daneren2005/shared-memory-ecs';
 // and makes it worse at closing, which measurably causes more of the circling this is meant to reduce, not
 // less.  A one-sided roll keeps every ship distinct without ever making one worse than the template.
 
-// Block layout (Float32Array, size 3).
+// How far past its own hull a ship looks for an enemy when its type does not ask for more.  A long-range type
+// (Railgun, Missile Frigate) sets a bigger `searchRange` so it can acquire targets as far out as it can shoot.
+export const DEFAULT_SEARCH_RANGE = 150;
+
+// Block layout (Float32Array, size 4).
 export const ATTACK_TARGET = 0;
 export const ATTACK_STEER_FORCE = 1;
 export const ATTACK_SPEED = 2;
+export const ATTACK_SEARCH_RANGE = 3;
 
 export interface AttackComponent {
 	index: number
 	target: number
 	steerForce: number
 	speed: number
+	searchRange: number
 }
 export interface AttackConfig {
 	attacks: boolean
 	steerForce: number
 	steerForceBonus?: number
 	speed: number
+	searchRange?: number
 }
 export const attackDefinition: ComponentDefinition<AttackComponent, Float32Array, AttackConfig> = {
 	type: Float32Array,
-	size: 3,
+	size: 4,
 	loadProperties: ['attacks'],
 	load(entity, memory, config) {
-		const index = memory.create([0, rollSteerForce(config.steerForce, config.steerForceBonus), config.speed]);
+		const index = memory.create([
+			0,
+			rollSteerForce(config.steerForce, config.steerForceBonus),
+			config.speed,
+			config.searchRange ?? DEFAULT_SEARCH_RANGE,
+		]);
 		const block = memory.getBlock(index);
 
 		return {
@@ -62,6 +74,12 @@ export const attackDefinition: ComponentDefinition<AttackComponent, Float32Array
 			},
 			set speed(value: number) {
 				block[ATTACK_SPEED] = value;
+			},
+			get searchRange() {
+				return block[ATTACK_SEARCH_RANGE];
+			},
+			set searchRange(value: number) {
+				block[ATTACK_SEARCH_RANGE] = value;
 			},
 		};
 	},

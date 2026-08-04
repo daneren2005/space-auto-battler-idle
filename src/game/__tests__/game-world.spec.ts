@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import GameWorld from '../entities/game-world';
 import entityList from '../entities/entity-list';
 import { factionCollision } from '@/data/collide-categories';
+import { SHIP_TYPE_INDEX } from '@/data/ship-types';
 
 // Two distinct station colours.  Ships inherit their owning station's colour, and targeting only ever picks a
 // different-coloured entity, so these pick who hunts whom.
@@ -15,7 +16,7 @@ const BLUE_FACTION = factionCollision(1);
 
 // spawnShipUpdate caps a fresh ship's per-axis velocity at this magnitude (px/second).
 const SHIP_SPEED = 100;
-// shipConfig's steerForce, and the fraction of it a ship may roll on top as it spawns.
+// skiffConfig's steerForce, and the fraction of it a ship may roll on top as it spawns.
 const SHIP_STEER_FORCE = 10;
 const SHIP_STEER_FORCE_BONUS = 0.5;
 
@@ -57,7 +58,7 @@ describe('GameWorld game loop', () => {
 			// each other (they all share its collide category), so they simply drift on their spawn velocity and can
 			// only ever bounce off the walls.
 			entities: [
-				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 1, x: 200, y: 200 },
+				{ type: 'station', color: RED, ...RED_FACTION, ships: { skiff: { rate: 1 } }, x: 200, y: 200 },
 			],
 		});
 		await world.init();
@@ -84,7 +85,7 @@ describe('GameWorld game loop', () => {
 		world.load({
 			bounds: { width: 400, height: 400 },
 			entities: [
-				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 20, x: 200, y: 200 },
+				{ type: 'station', color: RED, ...RED_FACTION, ships: { skiff: { rate: 20 } }, x: 200, y: 200 },
 			],
 		});
 		await world.init();
@@ -117,7 +118,7 @@ describe('GameWorld game loop', () => {
 			// 100 a second in tenth-of-a-second frames is 10 ships out of every single frame - far more than the old
 			// per-frame cap allowed.  A single faction again, so nothing can die and the count only ever goes up.
 			entities: [
-				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 100, x: 200, y: 200 },
+				{ type: 'station', color: RED, ...RED_FACTION, ships: { skiff: { rate: 100 } }, x: 200, y: 200 },
 			],
 		});
 		await world.init();
@@ -143,7 +144,7 @@ describe('GameWorld game loop', () => {
 		world.load({
 			bounds: { width: 400, height: 400 },
 			entities: [
-				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 1, x: 200, y: 200 },
+				{ type: 'station', color: RED, ...RED_FACTION, ships: { skiff: { rate: 1 } }, x: 200, y: 200 },
 			],
 		});
 		await world.init();
@@ -171,7 +172,7 @@ describe('GameWorld game loop', () => {
 		world.load({
 			bounds: { width: 400, height: 400 },
 			entities: [
-				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 0, x: 200, y: 200 },
+				{ type: 'station', color: RED, ...RED_FACTION, x: 200, y: 200 },
 			],
 		});
 		await world.init();
@@ -188,8 +189,8 @@ describe('GameWorld game loop', () => {
 		world.load({
 			bounds: { width: 400, height: 400 },
 			entities: [
-				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 0, x: 20, y: 20 },
-				{ type: 'station', color: BLUE, ...BLUE_FACTION, shipsPerSecond: 0, x: 380, y: 380 },
+				{ type: 'station', color: RED, ...RED_FACTION, x: 20, y: 20 },
+				{ type: 'station', color: BLUE, ...BLUE_FACTION, x: 380, y: 380 },
 			],
 		});
 		await world.init();
@@ -201,8 +202,8 @@ describe('GameWorld game loop', () => {
 		// they collide every eligible frame, and since each is the other's nearest target the steering resolves to
 		// a zero nudge - so they sit still and keep trading blows.  timeToRegenerateShields is pushed far out so
 		// shields can't tick back up and stall the fight.
-		const red = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION, timeToRegenerateShields: 1000 });
-		const blue = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: blueStation.eid, ...BLUE_FACTION, timeToRegenerateShields: 1000 });
+		const red = world.loadEntity({ type: 'skiff', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION, timeToRegenerateShields: 1000 });
+		const blue = world.loadEntity({ type: 'skiff', x: 200, y: 200, owner: blueStation.eid, ...BLUE_FACTION, timeToRegenerateShields: 1000 });
 		const redEid = red.eid;
 		const blueEid = blue.eid;
 
@@ -217,8 +218,8 @@ describe('GameWorld game loop', () => {
 		expect(redStation.components.controller!.money).toBe(1);
 		expect(blueStation.components.controller!.money).toBe(1);
 		// Losing a ship costs a faction nothing but the ship: its spawn rate is untouched by the death.
-		expect(redStation.components.controller!.shipsPerSecond).toBe(0);
-		expect(blueStation.components.controller!.shipsPerSecond).toBe(0);
+		expect(redStation.components.hangar!.rate(SHIP_TYPE_INDEX.skiff)).toBe(0);
+		expect(blueStation.components.hangar!.rate(SHIP_TYPE_INDEX.skiff)).toBe(0);
 	});
 
 	it('pays only the winning station when a stronger ship outlasts a weaker enemy', async () => {
@@ -226,8 +227,8 @@ describe('GameWorld game loop', () => {
 		world.load({
 			bounds: { width: 400, height: 400 },
 			entities: [
-				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 0, x: 20, y: 20 },
-				{ type: 'station', color: BLUE, ...BLUE_FACTION, shipsPerSecond: 0, x: 380, y: 380 },
+				{ type: 'station', color: RED, ...RED_FACTION, x: 20, y: 20 },
+				{ type: 'station', color: BLUE, ...BLUE_FACTION, x: 380, y: 380 },
 			],
 		});
 		await world.init();
@@ -237,8 +238,8 @@ describe('GameWorld game loop', () => {
 
 		// Same overlapping stand-off, but the red ship carries three shields to the blue ship's one, so red
 		// survives the exchange and blue is destroyed.
-		const red = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION, maxShields: 3, timeToRegenerateShields: 1000 });
-		const blue = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: blueStation.eid, ...BLUE_FACTION, maxShields: 1, timeToRegenerateShields: 1000 });
+		const red = world.loadEntity({ type: 'skiff', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION, maxShields: 3, timeToRegenerateShields: 1000 });
+		const blue = world.loadEntity({ type: 'skiff', x: 200, y: 200, owner: blueStation.eid, ...BLUE_FACTION, maxShields: 1, timeToRegenerateShields: 1000 });
 		const redEid = red.eid;
 		const blueEid = blue.eid;
 
@@ -256,6 +257,40 @@ describe('GameWorld game loop', () => {
 		expect(survivor!.components.health!.shields).toBe(1);
 	});
 
+	it('removes a ship\'s own contact damage on a ram rather than a flat one', async () => {
+		world = new GameWorld();
+		world.load({
+			bounds: { width: 400, height: 400 },
+			entities: [
+				{ type: 'station', color: RED, ...RED_FACTION, x: 20, y: 20 },
+				{ type: 'station', color: BLUE, ...BLUE_FACTION, x: 380, y: 380 },
+			],
+		});
+		await world.init();
+
+		const redStation = entityList(world)[0];
+		const blueStation = entityList(world)[1];
+
+		// The same overlapping stand-off as the fights above, but red hits far harder than the flat one a ram used
+		// to deal: contactDamage 3 against a four-shield blue.  Two exchanges (3 + 3) drop blue below zero, and red
+		// only ever takes blue's default one per exchange - so red ends on ten minus two.  Were damage still a flat
+		// one, blue would need five exchanges and red would end on five, which this cleanly separates from eight.
+		const red = world.loadEntity({ type: 'skiff', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION, contactDamage: 3, maxShields: 10, timeToRegenerateShields: 1000 });
+		const blue = world.loadEntity({ type: 'skiff', x: 200, y: 200, owner: blueStation.eid, ...BLUE_FACTION, maxShields: 4, timeToRegenerateShields: 1000 });
+		const redEid = red.eid;
+		const blueEid = blue.eid;
+
+		for(let i = 0; i < 40 && world.getEntityByEid(blueEid); i++) {
+			world.update(250);
+		}
+
+		const survivor = world.getEntityByEid(redEid);
+		expect(world.getEntityByEid(blueEid)).toBeUndefined();
+		expect(survivor).toBeDefined();
+		// Red spent one shield per exchange over the two it took to land the kill.
+		expect(survivor!.components.health!.shields).toBe(8);
+	});
+
 	it('gives a ship the bounciness that turns it around on contact, and a station none', async () => {
 		// The bounce is native now: a ship carries a bounciness of 1, so physics reflects its velocity off
 		// whatever it hits with no code in the collision callback for it.  A station never moves, so it has no
@@ -264,13 +299,13 @@ describe('GameWorld game loop', () => {
 		world.load({
 			bounds: { width: 400, height: 400 },
 			entities: [
-				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 0, x: 200, y: 200 },
+				{ type: 'station', color: RED, ...RED_FACTION, x: 200, y: 200 },
 			],
 		});
 		await world.init();
 
 		const station = entityList(world)[0];
-		const ship = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: station.eid, ...RED_FACTION });
+		const ship = world.loadEntity({ type: 'skiff', x: 200, y: 200, owner: station.eid, ...RED_FACTION });
 
 		expect(ship.components.bounciness!.bounciness).toBe(1);
 		expect(station.components.bounciness).toBeUndefined();
@@ -287,13 +322,13 @@ describe('GameWorld interpolation', () => {
 		gameWorld.load({
 			bounds: { width: 400, height: 400 },
 			entities: [
-				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 0, x: 20, y: 20 },
+				{ type: 'station', color: RED, ...RED_FACTION, x: 20, y: 20 },
 			],
 		});
 		await gameWorld.init();
 
 		const station = entityList(gameWorld)[0];
-		const ship = gameWorld.loadEntity({ type: 'ship', x: 200, y: 200, owner: station.eid, ...RED_FACTION, velocityX: 100, velocityY: 0 });
+		const ship = gameWorld.loadEntity({ type: 'skiff', x: 200, y: 200, owner: station.eid, ...RED_FACTION, velocityX: 100, velocityY: 0 });
 
 		return { gameWorld, ship };
 	}
@@ -340,8 +375,8 @@ describe('GameWorld targeting', () => {
 		gameWorld.load({
 			bounds: { width: 400, height: 400 },
 			entities: [
-				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 0, x: 20, y: 20 },
-				{ type: 'station', color: BLUE, ...BLUE_FACTION, shipsPerSecond: 0, x: 380, y: 380 },
+				{ type: 'station', color: RED, ...RED_FACTION, x: 20, y: 20 },
+				{ type: 'station', color: BLUE, ...BLUE_FACTION, x: 380, y: 380 },
 			],
 		});
 		await gameWorld.init();
@@ -354,9 +389,9 @@ describe('GameWorld targeting', () => {
 		const redStation = entityList(world)[0];
 		const blueStation = entityList(world)[1];
 
-		const hunter = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION });
-		const near = world.loadEntity({ type: 'ship', x: 240, y: 200, owner: blueStation.eid, ...BLUE_FACTION });
-		world.loadEntity({ type: 'ship', x: 300, y: 200, owner: blueStation.eid, ...BLUE_FACTION });
+		const hunter = world.loadEntity({ type: 'skiff', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION });
+		const near = world.loadEntity({ type: 'skiff', x: 240, y: 200, owner: blueStation.eid, ...BLUE_FACTION });
+		world.loadEntity({ type: 'skiff', x: 300, y: 200, owner: blueStation.eid, ...BLUE_FACTION });
 
 		world.update(16);
 
@@ -368,10 +403,10 @@ describe('GameWorld targeting', () => {
 		const redStation = entityList(world)[0];
 		const blueStation = entityList(world)[1];
 
-		const hunter = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION });
+		const hunter = world.loadEntity({ type: 'skiff', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION });
 		// Its own colour, and half the distance away - so a target picked on distance alone would be this one.
-		world.loadEntity({ type: 'ship', x: 230, y: 200, owner: redStation.eid, ...RED_FACTION });
-		const enemy = world.loadEntity({ type: 'ship', x: 260, y: 200, owner: blueStation.eid, ...BLUE_FACTION });
+		world.loadEntity({ type: 'skiff', x: 230, y: 200, owner: redStation.eid, ...RED_FACTION });
+		const enemy = world.loadEntity({ type: 'skiff', x: 260, y: 200, owner: blueStation.eid, ...BLUE_FACTION });
 
 		world.update(16);
 
@@ -383,9 +418,9 @@ describe('GameWorld targeting', () => {
 		world.load({
 			bounds: { width: 400, height: 400 },
 			entities: [
-				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 0, x: 20, y: 20 },
-				{ type: 'station', color: BLUE, ...BLUE_FACTION, shipsPerSecond: 0, x: 380, y: 380 },
-				{ type: 'station', color: BLUE, ...BLUE_FACTION, shipsPerSecond: 0, x: 200, y: 380 },
+				{ type: 'station', color: RED, ...RED_FACTION, x: 20, y: 20 },
+				{ type: 'station', color: BLUE, ...BLUE_FACTION, x: 380, y: 380 },
+				{ type: 'station', color: BLUE, ...BLUE_FACTION, x: 200, y: 380 },
 			],
 		});
 		await world.init();
@@ -395,7 +430,7 @@ describe('GameWorld targeting', () => {
 
 		// Both blue stations are well past the range a ship searches for enemies in, so this is the fallback
 		// picking between them rather than the search finding one.
-		const hunter = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION });
+		const hunter = world.loadEntity({ type: 'skiff', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION });
 
 		world.update(16);
 
@@ -407,14 +442,14 @@ describe('GameWorld targeting', () => {
 		world.load({
 			bounds: { width: 400, height: 400 },
 			entities: [
-				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 0, x: 20, y: 20 },
+				{ type: 'station', color: RED, ...RED_FACTION, x: 20, y: 20 },
 			],
 		});
 		await world.init();
 
 		const station = entityList(world)[0];
-		const hunter = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: station.eid, ...RED_FACTION });
-		world.loadEntity({ type: 'ship', x: 210, y: 200, owner: station.eid, ...RED_FACTION });
+		const hunter = world.loadEntity({ type: 'skiff', x: 200, y: 200, owner: station.eid, ...RED_FACTION });
+		world.loadEntity({ type: 'skiff', x: 210, y: 200, owner: station.eid, ...RED_FACTION });
 
 		world.update(16);
 
@@ -429,7 +464,7 @@ describe('GameWorld collision filtering', () => {
 		world.load({
 			bounds: { width: 400, height: 400 },
 			entities: [
-				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 0, x: 20, y: 20 },
+				{ type: 'station', color: RED, ...RED_FACTION, x: 20, y: 20 },
 			],
 		});
 		await world.init();
@@ -437,8 +472,8 @@ describe('GameWorld collision filtering', () => {
 		const station = entityList(world)[0];
 		// Overlapping exactly, as in the fights above - but both fly for the same faction, so neither one's mask
 		// accepts the other's category and the physics broadphase never reports the pair at all.
-		const first = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: station.eid, ...RED_FACTION, maxShields: 3, timeToRegenerateShields: 1000 });
-		const second = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: station.eid, ...RED_FACTION, maxShields: 3, timeToRegenerateShields: 1000 });
+		const first = world.loadEntity({ type: 'skiff', x: 200, y: 200, owner: station.eid, ...RED_FACTION, maxShields: 3, timeToRegenerateShields: 1000 });
+		const second = world.loadEntity({ type: 'skiff', x: 200, y: 200, owner: station.eid, ...RED_FACTION, maxShields: 3, timeToRegenerateShields: 1000 });
 
 		for(let i = 0; i < 10; i++) {
 			world.update(250);
@@ -457,9 +492,9 @@ describe('GameWorld collision filtering', () => {
 		world.load({
 			bounds: { width: 400, height: 400 },
 			entities: [
-				{ type: 'station', color: RED, ...RED_FACTION, shipsPerSecond: 0, x: 20, y: 20 },
+				{ type: 'station', color: RED, ...RED_FACTION, x: 20, y: 20 },
 				// maxShields 0, so the first hit that lands on it is fatal.
-				{ type: 'station', color: BLUE, ...BLUE_FACTION, shipsPerSecond: 0, x: 200, y: 200, maxShields: 0 },
+				{ type: 'station', color: BLUE, ...BLUE_FACTION, x: 200, y: 200, maxShields: 0 },
 			],
 		});
 		await world.init();
@@ -468,9 +503,9 @@ describe('GameWorld collision filtering', () => {
 		const blueStation = entityList(world)[1];
 
 		// A ship of the blue fleet, parked away from the fight: it dies with its station rather than to a collision.
-		const blueShip = world.loadEntity({ type: 'ship', x: 350, y: 350, owner: blueStation.eid, ...BLUE_FACTION, maxShields: 3, timeToRegenerateShields: 1000 });
+		const blueShip = world.loadEntity({ type: 'skiff', x: 350, y: 350, owner: blueStation.eid, ...BLUE_FACTION, maxShields: 3, timeToRegenerateShields: 1000 });
 		// A red ship sat right on the blue station.  A station is a circle body 20 across, so the ship overlaps it.
-		const redShip = world.loadEntity({ type: 'ship', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION, maxShields: 3, timeToRegenerateShields: 1000 });
+		const redShip = world.loadEntity({ type: 'skiff', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION, maxShields: 3, timeToRegenerateShields: 1000 });
 		const blueShipEid = blueShip.eid;
 		const blueStationEid = blueStation.eid;
 

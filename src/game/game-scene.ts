@@ -14,8 +14,15 @@ import { getLevelIndex } from '@/data/levels';
 import type { Carry } from '@/data/progress';
 import { saveProgress, resetProgress } from '@/data/progress';
 import type { Components } from './components';
-import { CONTROLLER_MONEY, CONTROLLER_SHIPS_PER_SECOND, CONTROLLER_SHIP_SHIELDS } from './components/controller';
+import {
+	hangarRateIndex,
+	hangarLevelIndex,
+	hangarRateBoughtIndex,
+	hangarLevelBoughtIndex,
+} from './components/hangar';
 import { HEALTH_SHIELDS } from './components/health';
+import { SHIP_TYPES, SHIP_TYPE_INDEX, SHIP_TYPE_DEFS, isShipType } from '@/data/ship-types';
+import ShipRoster from './ship-roster';
 import { playAreaViewport } from './display';
 import type GameWorld from './entities/game-world';
 import entityList from './entities/entity-list';
@@ -128,6 +135,9 @@ export default class GameScene extends Phaser.Scene {
 
 	// The station eid the human plays; -1 until the level is loaded.  Only this faction's money is spendable.
 	private playerStationEid = -1;
+	// The player's per-type upgrade economy, built once the player station is found in create().  The UI reads its
+	// costs/affordability and calls its unlock / buyRate / buyLevel through this scene's `shipRoster` getter.
+	private roster?: ShipRoster;
 	private state: GameState = 'playing';
 
 	private stationShips: Array<StationShipStat> = [];
@@ -143,9 +153,15 @@ export default class GameScene extends Phaser.Scene {
 	}
 
 	preload() {
+		// boid stays the fallback hull for anything without its own silhouette (a Carrier drone, a projectile).
 		this.load.image('boid', 'boid.png');
 		this.load.image('station', 'station.png');
 		this.load.image('shield', 'shield3.png');
+		// One white top-down silhouette per ship type, keyed by the type so dressSprite can select it straight off
+		// the entity's `type` (see plans/05-assets.md).  Still tinted per faction like boid was.
+		for(const type of SHIP_TYPES) {
+			this.load.image(type, SHIP_TYPE_DEFS[type].sprite);
+		}
 	}
 
 	create() {
@@ -212,16 +228,31 @@ export default class GameScene extends Phaser.Scene {
 		// The player faction is the (single) controller flagged `player` in the level.
 		this.playerStationEid = stations.find(station => station.components.controller!.player)?.eid ?? -1;
 
-		// Apply carried-over progress on top of this level's bases for the player.  Nothing has simulated yet,
-		// so plain writes here are safe (no worker is touching the block until the first update next frame).
+		// Apply carried-over progress on top of this level's bases for the player, and build the roster the UI drives.
+		// Nothing has simulated yet, so plain writes here are safe (no worker is touching the block until the first
+		// update next frame).  Each type's carried bought counts add onto both its rate/level and the matching bought
+		// counters, so the type ends up exactly where the player left it - the level config seeds a base, the carry
+		// rebuilds their purchases on top, and a type only the player unlocked (absent from the config) is rebuilt
+		// whole from its bought counts (see progress.ts / hangar.ts).
 		const playerController = this.playerController;
-		if(playerController) {
-			playerController.shipsPerSecond += this.carry.shipRateUpgrades;
-			playerController.shipShields += this.carry.shieldUpgrades;
+		const playerHangar = this.playerHangar;
+		const playerStation = this.world.getEntityByEid(this.playerStationEid);
+		if(playerController && playerHangar && playerStation) {
+			const hangarBlock = this.world.registry.hangar.memoryComponent.getBlock(playerHangar.index) as Int32Array;
+			for(const type of SHIP_TYPES) {
+				const ship = this.carry.ships[type];
+				if(!ship) {
+					continue;
+				}
+				const idx = SHIP_TYPE_INDEX[type];
+				hangarBlock[hangarRateIndex(idx)] += ship.rate;
+				hangarBlock[hangarLevelIndex(idx)] += ship.level;
+				hangarBlock[hangarRateBoughtIndex(idx)] += ship.rate;
+				hangarBlock[hangarLevelBoughtIndex(idx)] += ship.level;
+			}
 			playerController.money += this.carry.money;
-			// Keep the upgrade counts cumulative so the next upgrade's cost continues from where it left off.
-			playerController.upgrades += this.carry.shipRateUpgrades;
-			playerController.shieldUpgrades += this.carry.shieldUpgrades;
+
+			this.roster = new ShipRoster(this.world, playerStation);
 		}
 
 		this.input.keyboard?.on('keydown-SPACE', () => {
@@ -288,8 +319,12 @@ export default class GameScene extends Phaser.Scene {
 	// it will be drawn from.  Everything an entity can differ from the last owner of this sprite in is set here,
 	// so a pooled pair is indistinguishable from a new one.
 	private dressSprite(sprite: EntitySprite, entity: GameEntity, transform: NonNullable<GameEntity['components']['transform']>) {
-		// Before the scale below, which is worked out from the texture's own size.
-		sprite.setTexture(entity.components.controller ? 'station' : 'boid');
+		// Before the scale below, which is worked out from the texture's own size.  A station gets the station
+		// texture; a ship gets its type's silhouette (loaded under the type's key in preload); anything else - a
+		// Carrier drone, a projectile - falls back to the plain boid hull.  Each ship texture's pixel aspect matches
+		// its type's width:height, so the scale below stays uniform and the silhouette is not stretched.
+		const type = entity.components.entity.type;
+		sprite.setTexture(entity.components.controller ? 'station' : isShipType(type) ? type : 'boid');
 		sprite.setScale(transform.width / sprite.width, transform.height / sprite.height);
 		// The shield art points up (front-to-back runs along its Y axis) whereas the entity's `width` is its
 		// front-to-back length, so map width -> shield Y and height -> shield X to keep it skinny like the ship.
@@ -393,17 +428,20 @@ export default class GameScene extends Phaser.Scene {
 		return this.playerController?.money ?? 0;
 	}
 
-	// How fast this faction launches new ships, and how many of them are flying right now.  There is no cap on
-	// the fleet, so the second number is only ever a snapshot of spawns minus deaths.
-	get playerShipsPerSecond(): number {
-		return this.playerController?.shipsPerSecond ?? 0;
+	// The player faction's colour, used to tint the roster UI's ship icons the same way their ships are tinted.
+	get playerColor(): number {
+		return this.playerController?.color ?? 0xffffff;
 	}
+
+	// How many of the player's ships are flying right now.  There is no cap on the fleet, so this is only ever a
+	// snapshot of spawns minus deaths.
 	get playerShips(): number {
 		// Counted rather than filtered: the HUD reads this every frame, and at a few thousand ships an array of
 		// them thrown away immediately is not worth building.
 		let ships = 0;
 		this.world.entities.forEach(entity => {
-			if(entity.components.controlled?.owner === this.playerStationEid) {
+			// A projectile is `controlled` too, so exclude it - the fleet count is ships, not the shots they fire.
+			if(entity.components.controlled?.owner === this.playerStationEid && !entity.components.projectile) {
 				ships++;
 			}
 		});
@@ -411,60 +449,18 @@ export default class GameScene extends Phaser.Scene {
 		return ships;
 	}
 
-	// Cost of the next ship-rate upgrade: 1, 2, 4, 8, ... (doubles with each one bought).
-	get upgradeCost(): number {
-		return 2 ** (this.playerController?.upgrades ?? 0);
-	}
-	get canAffordUpgrade(): boolean {
-		const controller = this.playerController;
-		return !!controller && controller.money >= this.upgradeCost;
-	}
-
-	// Spend money to launch one more ship a second.  Returns whether the purchase went through.
-	buyUpgrade(): boolean {
-		const controller = this.playerController;
-		if(!controller || controller.money < this.upgradeCost) {
-			return false;
+	// The player's total launch rate across every type it builds, for the HUD's fleet summary.
+	get playerShipsPerSecond(): number {
+		if(!this.roster) {
+			return 0;
 		}
-
-		const cost = this.upgradeCost;
-		// money is mutated by collision workers and shipsPerSecond is read by the spawn worker, so touch the shared
-		// block atomically; upgrades is only ever written here, so a plain increment is safe.
-		const block = this.world.registry.controller.memoryComponent.getBlock(controller.index) as Int32Array;
-		Atomics.sub(block, CONTROLLER_MONEY, cost);
-		Atomics.add(block, CONTROLLER_SHIPS_PER_SECOND, 1);
-		controller.upgrades += 1;
-		return true;
+		return SHIP_TYPES.reduce((total, type) => total + this.roster!.rate(type), 0);
 	}
 
-	// The player faction's per-ship shield count, and the exponential cost of the next shield upgrade: 5, 10,
-	// 20, 40, ... (starts at 5, doubles each time).
-	get playerShipShields(): number {
-		return this.playerController?.shipShields ?? 0;
-	}
-	get shieldUpgradeCost(): number {
-		return 5 * 2 ** (this.playerController?.shieldUpgrades ?? 0);
-	}
-	get canAffordShieldUpgrade(): boolean {
-		const controller = this.playerController;
-		return !!controller && controller.money >= this.shieldUpgradeCost;
-	}
-
-	// Spend money to give every future ship this faction spawns one more shield.  Returns whether it went through.
-	buyShieldUpgrade(): boolean {
-		const controller = this.playerController;
-		if(!controller || controller.money < this.shieldUpgradeCost) {
-			return false;
-		}
-
-		const cost = this.shieldUpgradeCost;
-		// money is mutated by collision workers and shipShields is read by the spawn worker, so touch the shared
-		// block atomically; shieldUpgrades is only ever written here, so a plain increment is safe.
-		const block = this.world.registry.controller.memoryComponent.getBlock(controller.index) as Int32Array;
-		Atomics.sub(block, CONTROLLER_MONEY, cost);
-		Atomics.add(block, CONTROLLER_SHIP_SHIELDS, 1);
-		controller.shieldUpgrades += 1;
-		return true;
+	// The per-type upgrade economy the roster UI reads and buys through.  Undefined only before the level has
+	// loaded a player station (the stress test has one, so in practice it is always set by the time the UI runs).
+	get shipRoster(): ShipRoster | undefined {
+		return this.roster;
 	}
 
 	// --- Win/lose dialog + level progression ------------------------------------------------------------
@@ -502,17 +498,33 @@ export default class GameScene extends Phaser.Scene {
 		window.location.reload();
 	}
 
+	// The player's progress to carry into the next level: their money and, per type, how many rate / level upgrades
+	// they have bought (the hangar's bought counters, which reconstruct the whole line when re-applied - see
+	// create()).  Only types with something bought are stored, so the carry stays small and a locked type is simply
+	// absent.
 	private currentCarry(): Carry {
-		const controller = this.playerController;
-		return {
-			shipRateUpgrades: controller?.upgrades ?? 0,
-			shieldUpgrades: controller?.shieldUpgrades ?? 0,
-			money: controller?.money ?? 0,
-		};
+		const hangar = this.playerHangar;
+		const carry: Carry = { money: this.playerController?.money ?? 0, ships: {} };
+		if(hangar) {
+			for(const type of SHIP_TYPES) {
+				const idx = SHIP_TYPE_INDEX[type];
+				const rate = hangar.rateBought(idx);
+				const level = hangar.levelBought(idx);
+				if(rate > 0 || level > 0) {
+					carry.ships[type] = { rate, level };
+				}
+			}
+		}
+		return carry;
 	}
 
 	private get playerController() {
 		return this.world.getEntityByEid(this.playerStationEid)?.components.controller;
+	}
+
+	// The player station's production lines - where its Skiff rate + level live (see hangar component).
+	private get playerHangar() {
+		return this.world.getEntityByEid(this.playerStationEid)?.components.hangar;
 	}
 
 	// Runs every frame, so it answers both questions in the one pass over the world and builds no list of
@@ -552,7 +564,8 @@ export default class GameScene extends Phaser.Scene {
 	private refreshStats() {
 		const entities = entityList(this.world);
 		let stations = entities.filter(entity => !!entity.components.controller);
-		let ships = entities.filter(entity => !!entity.components.controlled);
+		// Projectiles are `controlled` as well; the fleet tally is ships only, so leave the shots out.
+		let ships = entities.filter(entity => !!entity.components.controlled && !entity.components.projectile);
 
 		this.stationShips.forEach(val => {
 			let matchingStation = stations.find(station => station.components.controller!.color === val.color);

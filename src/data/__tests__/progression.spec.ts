@@ -25,15 +25,30 @@ describe('progress', () => {
 		expect(loadProgress()).toEqual({ levelIndex: 0, carry: emptyCarry() });
 	});
 
-	it('round-trips a saved progress record', () => {
-		const progress = { levelIndex: 1, carry: { shipRateUpgrades: 3, shieldUpgrades: 2, money: 7 } };
+	it('round-trips a saved per-type carry', () => {
+		const progress = {
+			levelIndex: 1,
+			carry: { money: 7, ships: { skiff: { rate: 3, level: 2 }, gunner: { rate: 1, level: 1 } } },
+		};
 		saveProgress(progress);
 		expect(loadProgress()).toEqual(progress);
 	});
 
-	it('backfills missing carry fields from a partial record', () => {
-		saveProgress({ levelIndex: 1, carry: { shipRateUpgrades: 4 } as never });
-		expect(loadProgress()).toEqual({ levelIndex: 1, carry: { shipRateUpgrades: 4, shieldUpgrades: 0, money: 0 } });
+	it('backfills a partial per-type entry to whole rate/level counts', () => {
+		saveProgress({ levelIndex: 1, carry: { ships: { skiff: { rate: 4 } } } as never });
+		expect(loadProgress()).toEqual({
+			levelIndex: 1,
+			carry: { money: 0, ships: { skiff: { rate: 4, level: 0 } } },
+		});
+	});
+
+	it('migrates a pre-roster three-scalar carry onto the Skiff line', () => {
+		// The shape saved before the roster: rate / shield upgrade counts + money, with no per-type map at all.
+		saveProgress({ levelIndex: 2, carry: { shipRateUpgrades: 5, shieldUpgrades: 3, money: 9 } } as never);
+		expect(loadProgress()).toEqual({
+			levelIndex: 2,
+			carry: { money: 9, ships: { skiff: { rate: 5, level: 3 } } },
+		});
 	});
 
 	it('reset clears back to the default', () => {

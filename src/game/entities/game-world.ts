@@ -10,6 +10,8 @@ import { createUpdateHealthTimersSystem } from '../systems/update-health-timers-
 import { createSpawnShipSystem } from '../systems/spawn-ship-system';
 import { createTargetEnemySystem } from '../systems/target-enemy-system';
 import { createMoveToTargetSystem } from '../systems/move-to-target-system';
+import { createWeaponSystem } from '../systems/weapon-system';
+import { createUpdateProjectilesSystem } from '../systems/update-projectiles-system';
 
 // The scene format produced by generate-scene: a flat list of entity configs plus the play-area size.
 export interface Scene {
@@ -61,7 +63,12 @@ export default class GameWorld extends BaseWorld<typeof registry> {
 		const physicsSystem = this.addSystem(createPhysicsSystem(this));
 		this.addSystem(createInterpolationSystem(this));
 		this.addSystem(createTargetEnemySystem(this));
+		// Weapons fire after targeting has picked each ship's target and before movement, so a ship shoots at
+		// whoever it is about to steer toward.  Projectile upkeep (lifetime + homing guidance) runs last, once the
+		// shots this frame have been created and everything has its final position.
+		this.addSystem(createWeaponSystem(this));
 		this.addSystem(createMoveToTargetSystem(this));
+		this.addSystem(createUpdateProjectilesSystem(this));
 
 		return physicsSystem;
 	}

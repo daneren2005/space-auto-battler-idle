@@ -1,20 +1,40 @@
 import type { Config } from '@/game/components';
+import { SHIP_TYPE_DEFS, type ShipType } from '@/data/ship-types';
+import { DEFAULT_SEARCH_RANGE } from '@/game/components/attack';
 
-// A ship: small, fast, hunts enemies.  It stays a 10x5 rectangle body - the default shape for a config with a
-// width and a height - so it is only as wide as it looks nose-on.  `attacks` opts it into the targeting
-// component and `owner` (its station's eid) is supplied per-spawn, along with the collide category + mask it
-// inherits from that station.  `steerForceBonus` rolls each ship somewhere between 10 and 15 steer force as it
-// spawns, so no two turn at quite the same radius.
+// Turns a ship type's catalog entry (ship-types.ts) into an entity template.  Every buildable ship is built the
+// same way - the numbers that make one type differ from another all live in its def - so this one factory stands
+// in for the ten hand-written templates the roster would otherwise need.  The fields spelled out here are the
+// physics / lifecycle wiring every ship shares:
 //
-// `velocityX` of 0 is what loads the velocity component: a ship spawned by a station overrides it with a real
-// heading, and one placed directly (a test, a scripted encounter) still starts out able to move.
-// `interpolate` gives it a render position: physics runs on a 50ms step, so without one a ship's sprite would
-// only move on one frame in three.
-//
-// `bounciness` of 1 is what makes a ship rebound off whatever it runs into with no speed lost: physics reflects
-// its velocity about the contact normal on collision, so the bounce is native rather than something the physics
-// update writes by hand.  Stations never move, so only ships carry it.
-export const shipConfig: Config = {
-	type: 'ship', width: 10, height: 5, maxShields: 0, timeToRegenerateShields: 1, damageCooldown: 0.2,
-	velocityX: 0, speed: 100, attacks: true, steerForce: 10, steerForceBonus: 0.5, interpolate: true, bounciness: 1,
-};
+//  - It stays a `width` x `height` rectangle body (the default shape for a config with a width and height).
+//  - `attacks` opts it into the targeting + steering components; a type that shoots past ram range sees as far as
+//    it can shoot (searchRange follows its weapon range) so it can acquire before it is in danger.
+//  - `contactDamage` (and `blastRadius`, for a detonator) go on the combat block; a `weapon` def loads the weapon
+//    block and makes the ship fire.  `maxShields` / `contactDamage` / weapon `damage` here are only the level-1
+//    base a directly-placed ship uses - a spawned one is stamped with the values for its station's current level.
+//  - `velocityX` of 0 loads the velocity component (a spawned ship overrides it with a real heading; one placed
+//    directly still starts able to move).  `interpolate` gives it a smooth render position between physics steps,
+//    and `bounciness` of 1 rebounds it off whatever it runs into.  `steerForceBonus` rolls each ship its own
+//    steer force as it spawns.  `owner` and the collide category + mask it inherits are supplied per spawn.
+export function makeShipConfig(type: ShipType): Config {
+	const def = SHIP_TYPE_DEFS[type];
+	const config: Config = {
+		type,
+		width: def.width, height: def.height,
+		speed: def.speed, steerForce: def.steerForce, steerForceBonus: def.steerBonus,
+		maxShields: def.baseShields, contactDamage: def.contactDamage,
+		searchRange: Math.max(DEFAULT_SEARCH_RANGE, def.weapon?.range ?? 0),
+		timeToRegenerateShields: 1, damageCooldown: 0.2,
+		velocityX: 0, attacks: true, interpolate: true, bounciness: 1,
+	};
+
+	if(def.detonateOnContact) {
+		config.blastRadius = def.detonateOnContact.blastRadius;
+	}
+	if(def.weapon) {
+		config.weapon = def.weapon;
+	}
+
+	return config;
+}

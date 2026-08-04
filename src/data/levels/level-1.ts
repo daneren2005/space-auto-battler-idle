@@ -1,4 +1,5 @@
 import type { LevelConfig } from './types';
+import type { Config } from '@/game/components';
 import { PLAYER_COLOR, ENEMY_COLOR } from '@/data/colors';
 import { factionCollision } from '@/data/collide-categories';
 
@@ -11,10 +12,10 @@ const MARGIN = 80;
 
 // The starting level: the player's station sits at the bottom - nearest the upgrade buttons they tap - and a
 // single enemy station at the top, both horizontally centred so their fleets meet in the middle.  Each faction
-// launches one ship a second and gives it no shields, so ships die in a single hit and kills come quickly - and
-// with the two sides on the same rate, the player only pulls ahead by buying upgrades.  factionCollision gives
-// each station (and so its ships) a collide category of its own, which is what keeps a faction's own ships from
-// running into each other.
+// builds a single Skiff line at one ship a second, level 1 - the base, unlocked Skiff with no shields - so ships
+// die in a single hit and kills come quickly, and with the two sides on the same rate the player only pulls ahead
+// by buying upgrades.  factionCollision gives each station (and so its ships) a collide category of its own, which
+// is what keeps a faction's own ships from running into each other.
 export const level1: LevelConfig = {
 	name: 'level-1',
 	title: 'First Contact',
@@ -28,17 +29,15 @@ export const level1: LevelConfig = {
 			color: PLAYER_COLOR,
 			...factionCollision(0),
 			player: true,
-			shipsPerSecond: 1,
-			shipShields: 0,
-		},
+			ships: { skiff: { rate: 1, level: 1 } },
+		} satisfies Config,
 		{
 			type: 'station',
 			x: WIDTH / 2,
 			y: MARGIN,
 			color: ENEMY_COLOR,
 			...factionCollision(1),
-			shipsPerSecond: 1,
-			shipShields: 0,
-		},
+			ships: { skiff: { rate: 1, level: 1 } },
+		} satisfies Config,
 	],
 };

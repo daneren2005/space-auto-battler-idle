@@ -24,16 +24,19 @@ export default defineConfig(({ mode }) => {
 				'@daneren2005/shared-memory-objects',
 			],
 		},
+		plugins: [],
 
 		build: {
 			assetsInlineLimit: 0,
-			// Two pages: the game itself, and the engine stress test at /stress-test (its own directory so the URL
-			// has no extension and resolves on a plain static host).  Naming any input here replaces Vite's default
-			// single index.html entry, so the game page has to be listed too.
+			// Three pages: the game itself, the engine stress test at /stress-test, and the roster showcase at
+			// /ship-test (each in its own directory so the URL has no extension and resolves on a plain static host).
+			// Naming any input here replaces Vite's default single index.html entry, so the game page has to be
+			// listed too.
 			rollupOptions: {
 				input: {
 					main: fileURLToPath(new URL('./index.html', import.meta.url)),
 					stressTest: fileURLToPath(new URL('./stress-test/index.html', import.meta.url)),
+					shipTest: fileURLToPath(new URL('./ship-test/index.html', import.meta.url)),
 				},
 			},
 		},

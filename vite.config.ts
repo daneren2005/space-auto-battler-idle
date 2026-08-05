@@ -11,7 +11,7 @@ const crossOriginIsolationHeaders = {
 
 export default defineConfig(({ mode }) => {
 	return {
-		base: mode === 'production' ? '/space-auto-battler-idle/' : '/',
+		base: mode === 'production' ? '' : '/',
 		resolve: {
 			alias: {
 				'@': fileURLToPath(new URL('./src', import.meta.url)),

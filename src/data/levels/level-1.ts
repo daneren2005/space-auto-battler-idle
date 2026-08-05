@@ -2,6 +2,7 @@ import type { LevelConfig } from './types';
 import type { Config } from '@/game/components';
 import { PLAYER_COLOR, ENEMY_COLOR } from '@/data/colors';
 import { factionCollision } from '@/data/collide-categories';
+import { PLAYER_START_SHIPS } from './player-start';
 
 // The playing field is deliberately small so ships cross it quickly, and portrait so it fills the tall mobile
 // canvas; later levels bump these up (the display is a fixed size and the game camera zooms to fit whatever
@@ -29,7 +30,8 @@ export const level1: LevelConfig = {
 			color: PLAYER_COLOR,
 			...factionCollision(0),
 			player: true,
-			ships: { skiff: { rate: 1, level: 1 } },
+			// The player's starting fleet, shared by every level so it carries forward unchanged (see player-start).
+			ships: PLAYER_START_SHIPS,
 		} satisfies Config,
 		{
 			type: 'station',

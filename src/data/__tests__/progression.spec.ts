@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { loadProgress, saveProgress, resetProgress, emptyCarry } from '../progress';
 import { levels, firstLevel, getLevel, getLevelIndex } from '../levels';
+import { PLAYER_START_SHIPS } from '../levels/player-start';
 
 // The progress module reads/writes localStorage, which the node test environment lacks - stub a minimal one.
 class MemoryStorage {
@@ -78,6 +79,28 @@ describe('levels', () => {
 		levels.forEach(level => {
 			expect(level.bounds.height).toBeGreaterThan(level.bounds.width);
 		});
+	});
+
+	it('seeds every level\'s player station with the same starting loadout so a carried fleet is reproduced exactly', () => {
+		// The player carries their bought upgrades onto the level's player-station base, so for the fleet they left
+		// the previous level with to come back unchanged, that base must be identical in every level - only the enemy
+		// escalates.  A level seeding the player a bigger base would let their upgrades stack on top of it and jump
+		// their fleet forward for free just by advancing (see data/levels/player-start).
+		levels.forEach(level => {
+			const player = level.entities.find(entity => entity.type === 'station' && entity.player);
+			expect(player?.ships).toEqual(PLAYER_START_SHIPS);
+		});
+	});
+
+	it('lets the enemy base escalate past the player start to ramp difficulty', () => {
+		// The whole point of holding the player base constant is that the challenge comes from the enemy instead, so
+		// at least one later level must field a tougher enemy than the shared player start does.
+		const startLevel = PLAYER_START_SHIPS.skiff?.level ?? 0;
+		const enemiesEscalate = levels.some(level => {
+			const enemy = level.entities.find(entity => entity.type === 'station' && !entity.player);
+			return (enemy?.ships?.skiff?.level ?? 0) > startLevel;
+		});
+		expect(enemiesEscalate).toBe(true);
 	});
 
 	it('places the player at the bottom and the enemy at the top, both horizontally centred', () => {

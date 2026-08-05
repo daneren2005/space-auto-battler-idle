@@ -21,6 +21,7 @@ import {
 	hangarLevelBoughtIndex,
 } from './components/hangar';
 import { HEALTH_SHIELDS } from './components/health';
+import { DETONATED_EVENT } from './components/combat';
 import { SHIP_TYPES, SHIP_TYPE_INDEX, SHIP_TYPE_DEFS, isShipType } from '@/data/ship-types';
 import ShipRoster from './ship-roster';
 import { playAreaViewport } from './display';
@@ -53,6 +54,20 @@ type EntitySprite = Phaser.GameObjects.Image & {
 	// Float32Array or null for something with no health at all: read through HEALTH_SHIELDS.
 	healthBlock: Float32Array | null
 };
+
+// One live explosion: the sprite being animated, how far through its life it is, and the scale it reaches at
+// full spread - `fullScale` sizes the texture so its footprint is the detonator's blast diameter, so at its peak
+// the shock ring baked into the art sits on the AoE the blast actually dealt.
+interface Explosion {
+	sprite: Phaser.GameObjects.Image
+	// Milliseconds since it went off; it is retired once this passes EXPLOSION_DURATION.
+	age: number
+	fullScale: number
+}
+
+// How long an explosion takes to expand and fade, in milliseconds.  Short - it is a hit-flash over the blast, not
+// a lingering effect.
+const EXPLOSION_DURATION = 150;
 
 // A single station's ship tally, used to render the per-team breakdown in the debug panel.
 export interface StationShipStat {
@@ -133,6 +148,12 @@ export default class GameScene extends Phaser.Scene {
 	// Hull + shield pairs whose entity has died, hidden and kept for the next ship rather than destroyed.
 	private spritePool: Array<EntitySprite> = [];
 
+	// Detonator blasts currently playing, advanced each frame by updateExplosions, plus the spent sprites kept for
+	// the next blast.  Pooled like the ship sprites: explosions are bursty (a wave of kamikaze Detonators can go
+	// off together), so reusing the sprite avoids churning the display list at the worst moment to do it.
+	private explosions: Array<Explosion> = [];
+	private explosionPool: Array<Phaser.GameObjects.Image> = [];
+
 	// The station eid the human plays; -1 until the level is loaded.  Only this faction's money is spendable.
 	private playerStationEid = -1;
 	// The player's per-type upgrade economy, built once the player station is found in create().  The UI reads its
@@ -157,6 +178,8 @@ export default class GameScene extends Phaser.Scene {
 		this.load.image('boid', 'boid.png');
 		this.load.image('station', 'station.png');
 		this.load.image('shield', 'shield3.png');
+		// The one-shot blast played over a Detonator's AoE when it goes off (see spawnExplosion / plans/05-assets.md).
+		this.load.image('explosion', 'effects/explosion.png');
 		// One white top-down silhouette per ship type, keyed by the type so dressSprite can select it straight off
 		// the entity's `type` (see plans/05-assets.md).  Still tinted per faction like boid was.
 		for(const type of SHIP_TYPES) {
@@ -283,6 +306,11 @@ export default class GameScene extends Phaser.Scene {
 		// at these counts, nearly all of them did.
 		this.syncSprites();
 
+		// Advance any detonator blasts playing over the fleet.  Off the same delta the world just stepped, so an
+		// explosion keeps pace with the game when it is running (and freezes with it when paused, since this whole
+		// method returns early then).
+		this.updateExplosions(delta);
+
 		this.checkForGameOver();
 	}
 
@@ -301,6 +329,15 @@ export default class GameScene extends Phaser.Scene {
 		const sprite = this.spritePool.pop() ?? this.createSprite();
 		this.dressSprite(sprite, entity, transform);
 		this.eidSpriteMap.set(entity.eid, sprite);
+
+		// A Detonator fires DETONATED_EVENT on itself the moment its blast goes off (from the worker, just before it
+		// dies), carrying where it detonated and how far the blast reached - listen for it so we can draw the AoE.
+		// Only the handful of types that detonate get a listener, and it dies with the (never-pooled) entity, so
+		// there is nothing to unsubscribe.
+		const type = entity.components.entity.type;
+		if(isShipType(type) && SHIP_TYPE_DEFS[type].detonateOnContact) {
+			entity.on(DETONATED_EVENT, (x: number, y: number, radius: number) => this.spawnExplosion(x, y, radius));
+		}
 
 		// Nothing has moved yet, so place it where it starts.
 		this.syncSprite(sprite);
@@ -355,6 +392,57 @@ export default class GameScene extends Phaser.Scene {
 		sprite.visible = false;
 		sprite.shieldImage.visible = false;
 		this.spritePool.push(sprite);
+	}
+
+	// Kicks off an explosion over a blast the worker just resolved: centred where the Detonator went off and sized
+	// so the texture's footprint is the blast diameter, so as it spreads the shock ring in the art lands on the
+	// edge of the AoE the blast actually dealt.  In world coordinates on the game camera, exactly like the ships,
+	// so it zooms with the level and sits over the fleet.  updateExplosions animates it from here.
+	private spawnExplosion(x: number, y: number, radius: number) {
+		const sprite = this.explosionPool.pop() ?? this.createExplosion();
+		sprite.setPosition(x, y);
+		// A random spin so a wave of blasts doesn't show the same star flash stamped at the same angle.
+		sprite.setRotation(Math.random() * Math.PI * 2);
+		sprite.setVisible(true);
+
+		this.explosions.push({ sprite, age: 0, fullScale: (radius * 2) / sprite.width });
+	}
+
+	// A fresh explosion sprite, drawn additively so its fire reads as light over the dark play area and overlapping
+	// blasts build up, and above the fleet so it is never hidden behind a hull.  Its per-blast position/scale/alpha
+	// are set by spawnExplosion + updateExplosions.
+	private createExplosion(): Phaser.GameObjects.Image {
+		const sprite = this.add.image(0, 0, 'explosion');
+		sprite.setBlendMode(Phaser.BlendModes.ADD);
+		sprite.setDepth(1);
+
+		return sprite;
+	}
+
+	// Every live blast, once per frame.  Each expands with an ease-out (fast punch, then settling into the full AoE)
+	// and holds bright before fading out over the back half of its life, so there is a clear moment where it covers
+	// the whole blast radius at full strength.  A spent one is hidden and kept for the next blast (swap-and-pop, so
+	// the retirement is order-independent and allocation-free).
+	private updateExplosions(delta: number) {
+		for(let i = this.explosions.length - 1; i >= 0; i--) {
+			const explosion = this.explosions[i];
+			explosion.age += delta;
+			const t = explosion.age / EXPLOSION_DURATION;
+			if(t >= 1) {
+				explosion.sprite.visible = false;
+				this.explosionPool.push(explosion.sprite);
+				this.explosions[i] = this.explosions[this.explosions.length - 1];
+				this.explosions.pop();
+				continue;
+			}
+
+			// Reaches full spread by ~60% of its life (grow clamps to 1 there), then holds it while it fades.
+			const grow = Math.min(1, t / 0.6);
+			const eased = 1 - (1 - grow) * (1 - grow) * (1 - grow);
+			explosion.sprite.setScale(explosion.fullScale * (0.35 + 0.65 * eased));
+			// Full strength through the first 40%, then a linear fade to nothing.
+			explosion.sprite.alpha = t < 0.4 ? 1 : 1 - (t - 0.4) / 0.6;
+		}
 	}
 
 	// Puts one entity's sprite where its entity is.  Everything it draws with - position, facing, whether the

@@ -50,6 +50,9 @@ export interface WeaponDef {
 	homing?: boolean
 	homingTurn?: number
 	spawnsDrones?: boolean
+	// Once in firing range the ship slides side-to-side across its target instead of holding still, loosing its
+	// shots out the side as it weaves (the Missile Frigate and its homing missiles).  See move-to-target.
+	strafe?: boolean
 	// The word the upgrade UI uses for this weapon's shots - a Gunner fires "bullets", a Scatter Gun "pellets" - so
 	// each ship's card names its damage in its own terms instead of the generic "projectile".  Omitted for a weapon
 	// that spawns drones (the Carrier), which the card describes by drone count rather than per-shot damage.
@@ -82,11 +85,18 @@ export interface ShipTypeDef {
 	// is the base, unlocked ship.
 	shieldsPerLevel?: number
 	levelsPerDamage?: number
+	// For a drone-spawning type (the Carrier), how many levels it must earn to launch one more drone per volley -
+	// the drone-count equivalent of `levelsPerDamage`, so a levelled Carrier fields a bigger swarm.
+	levelsPerDrone?: number
 	// Its weapon, if any.
 	weapon?: WeaponDef
 	// If set, the ship explodes on contact instead of ramming, dealing its contact damage to everything within
 	// `blastRadius` and dying (the Detonator).
 	detonateOnContact?: { blastRadius: number }
+	// The kill reward a ship of this type hands the faction that destroys it - stamped onto each ship's combat
+	// block at spawn (see data/entities/ship.ts) so the collision code can pay it out without re-deriving the type.
+	// It scales up with a type's price so the pricier ships in the roster are worth more to kill than the Skiff.
+	killReward: number
 	// Upgrade economy (cost = base * growth ** timesBought).  `unlockCost` buys the first rate of a locked type.
 	unlockCost: number
 	rateCostBase: number
@@ -126,6 +136,20 @@ export function weaponDamageForLevel(def: ShipTypeDef, level: number): number {
 	return def.weapon.damage + damageBonusForLevel(def, level);
 }
 
+// How many levels a drone-spawner needs to earn to launch one more drone when its type does not name its own.
+const DEFAULT_LEVELS_PER_DRONE = 3;
+
+// How many drones a drone-spawning type launches per volley at a given level: its base count plus one for every
+// `levelsPerDrone` levels earned, so a Carrier's swarm grows as it is levelled.  A type that does not spawn drones
+// (or is below level 2) just fields its base count, so this is safe to call for any weapon.
+export function droneCountForLevel(def: ShipTypeDef, level: number): number {
+	const base = def.weapon?.projectileCount ?? 1;
+	if(!def.weapon?.spawnsDrones || level <= 1) {
+		return base;
+	}
+	return base + Math.floor((level - 1) / (def.levelsPerDrone ?? DEFAULT_LEVELS_PER_DRONE));
+}
+
 // --- Upgrade-card copy ----------------------------------------------------------------------------------------
 // Turns a type's def into the offence line and next-level preview its upgrade card shows, so the UI can name each
 // ship's damage in its own terms and spell out exactly what the next Level buy grants.
@@ -135,7 +159,7 @@ export function weaponDamageForLevel(def: ShipTypeDef, level: number): number {
 // no direct damage of its own), a Detonator its blast, and an unarmed rammer (the Skiff) its ram damage.
 export function combatStat(def: ShipTypeDef, level: number): { label: string, value: number } {
 	if(def.weapon?.spawnsDrones) {
-		return { label: 'Drones/launch', value: def.weapon.projectileCount ?? 1 };
+		return { label: 'Drones/launch', value: droneCountForLevel(def, level) };
 	}
 	if(def.weapon) {
 		return { label: `${def.weapon.projectileNoun ?? 'Shot'} damage`, value: weaponDamageForLevel(def, level) };
@@ -158,8 +182,15 @@ export function nextLevelSummary(def: ShipTypeDef, level: number): string {
 		parts.push(`+${shieldGain} shield${shieldGain === 1 ? '' : 's'}`);
 	}
 
-	// A Carrier's drones carry fixed stats, so a level buys it no damage - skip the damage term entirely for it.
-	if(!def.weapon?.spawnsDrones) {
+	// A drone-spawner (the Carrier) grows its swarm rather than its per-shot damage, so its preview promises extra
+	// drones on the levels that add one; every other type shows the damage its next level grants on the slower
+	// cadence.
+	if(def.weapon?.spawnsDrones) {
+		const droneGain = droneCountForLevel(def, next) - droneCountForLevel(def, level);
+		if(droneGain > 0) {
+			parts.push(`+${droneGain} drone${droneGain === 1 ? '' : 's'}`);
+		}
+	} else {
 		const damageGain = def.weapon
 			? weaponDamageForLevel(def, next) - weaponDamageForLevel(def, level)
 			: contactDamageForLevel(def, next) - contactDamageForLevel(def, level);
@@ -182,6 +213,11 @@ export function unlockCost(def: ShipTypeDef): number {
 	return def.unlockCost;
 }
 
+// The kill reward a ship of this type is worth, for stamping onto its combat block at spawn.
+export function killReward(def: ShipTypeDef): number {
+	return def.killReward;
+}
+
 // The next rate upgrade's cost, given how many rate upgrades this type has already had.  bought 0 (a freshly built
 // type, or the Skiff's base line) is the cheapest, at rateCostBase.
 export function rateCost(def: ShipTypeDef, rateBought: number): number {
@@ -193,13 +229,30 @@ export function levelCost(def: ShipTypeDef, levelBought: number): number {
 	return def.levelCostBase * def.levelCostGrowth ** levelBought;
 }
 
-// Shared upgrade-economy defaults, so a def only spells out what makes it more or less expensive than the norm.
-const ECONOMY = {
+// The Skiff's upgrade economy.  It is the always-unlocked starter (unlockCost 0), so it has no unlock price to
+// anchor its upgrades against and just uses these cheap flat bases - the cheapest line in the roster.
+const SKIFF_ECONOMY = {
 	rateCostBase: 10,
 	rateCostGrowth: 2,
 	levelCostBase: 5,
 	levelCostGrowth: 2,
 };
+
+// The upgrade economy for an unlockable type, derived from what it costs to unlock so the pricier ships also cost
+// more to improve.  Unlocking a type leaves both its bought counters at 1 (see ShipRoster.unlock), so the first
+// upgrade the player can then buy is priced at bought 1: base * growth.  Anchoring the bases to the unlock cost
+// - level base at half, rate base at the full unlock cost - makes that first level upgrade cost exactly the
+// unlock price and the first rate upgrade twice it, so no first upgrade is ever cheaper than the unlock itself
+// while a rate (a permanent extra ship a second) stays dearer than a single level.  Every unlock cost is even,
+// so the halved level base stays a whole number.
+function tierEconomy(cost: number) {
+	return {
+		rateCostBase: cost,
+		rateCostGrowth: 2,
+		levelCostBase: cost / 2,
+		levelCostGrowth: 2,
+	};
+}
 
 export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 	// 1. Skiff - the basic ship: cheap, fast, disposable.  Rams for one, no shields until levelled.  Always the
@@ -210,7 +263,8 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		width: 10, height: 5,
 		speed: 100, steerForce: 10, steerBonus: 0.5,
 		baseShields: 0, contactDamage: 1,
-		unlockCost: 0, ...ECONOMY,
+		killReward: 1,
+		unlockCost: 0, ...SKIFF_ECONOMY,
 	},
 	// 2. Gunner - straight-shot corvette: the first thing unlocked, introduces bullets.  Keeps its distance
 	// (contact damage 0) and fires a single medium-range bullet; starts with a shield.
@@ -218,32 +272,37 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		name: 'Gunner',
 		sprite: 'ships/gunner.png',
 		width: 12, height: 8,
-		speed: 80, steerForce: 8, steerBonus: 0.5,
+		speed: 80, steerForce: 8, steerBonus: 0.2,
 		baseShields: 1, contactDamage: 0,
 		weapon: { range: 120, fireInterval: 0.6, projectileCount: 1, projectileSpeed: 260, damage: 1, projectileNoun: 'Bullet' },
-		unlockCost: 40, ...ECONOMY,
+		killReward: 2,
+		unlockCost: 40, ...tierEconomy(40),
 	},
 	// 3. Missile Frigate - homing swarm: a volley of low-damage homing missiles, medium-long range, fragile and
-	// slow, no shields until upgraded.
+	// slow, no shields until upgraded.  Once in range it strafes across the enemy's front, raining its missiles out
+	// the side; its low steer force gives it a wide turn so a batch fans out along their spawn headings.
 	missileFrigate: {
 		name: 'Missile Frigate',
 		sprite: 'ships/missile-frigate.png',
 		width: 16, height: 10,
-		speed: 60, steerForce: 6, steerBonus: 0.5,
+		speed: 60, steerForce: 3, steerBonus: 0.4,
 		baseShields: 0, contactDamage: 0,
-		weapon: { range: 160, fireInterval: 1.4, projectileCount: 3, spread: 0.3, projectileSpeed: 160, damage: 1, homing: true, projectileNoun: 'Missile' },
-		unlockCost: 120, ...ECONOMY,
+		weapon: { range: 160, fireInterval: 1.4, projectileCount: 3, spread: 0.3, projectileSpeed: 160, damage: 1, homing: true, strafe: true, projectileNoun: 'Missile' },
+		killReward: 3,
+		unlockCost: 120, ...tierEconomy(120),
 	},
 	// 4. Railgun Lancer - long-range glass cannon: one very-high-damage straight slug, very long range and reload,
-	// slow and shieldless.  Needs to acquire targets far past ram range (its weapon range drives its search).
+	// slow and shieldless.  Needs to acquire targets far past ram range (its weapon range drives its search).  A big
+	// hull with a low steer force, so it turns slowly and spreads out from its spawn heading.
 	railgunLancer: {
 		name: 'Railgun Lancer',
 		sprite: 'ships/railgun-lancer.png',
 		width: 18, height: 6,
-		speed: 45, steerForce: 5, steerBonus: 0.5,
+		speed: 45, steerForce: 2.5, steerBonus: 0.1,
 		baseShields: 0, contactDamage: 0,
 		weapon: { range: 260, fireInterval: 3, projectileCount: 1, projectileSpeed: 500, damage: 6, projectileNoun: 'Slug' },
-		unlockCost: 200, rateCostBase: 20, rateCostGrowth: 2, levelCostBase: 12, levelCostGrowth: 2,
+		killReward: 4,
+		unlockCost: 200, ...tierEconomy(200),
 	},
 	// 5. Detonator - AoE kamikaze: no weapon, explodes on contact for high damage across a blast radius, then
 	// dies.  Medium speed, no shields.
@@ -254,18 +313,21 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		speed: 90, steerForce: 9, steerBonus: 0.5,
 		baseShields: 0, contactDamage: 4,
 		detonateOnContact: { blastRadius: 40 },
-		unlockCost: 160, ...ECONOMY,
+		killReward: 4,
+		unlockCost: 160, ...tierEconomy(160),
 	},
 	// 6. Bulwark - shield tank: lots of shields (and extra per level), slow, a short-range light gun; a moving
-	// wall that soaks fire and still chips in a little damage by ram or bullet.
+	// wall that soaks fire and still chips in a little damage by bullet.  A big hull with a low steer force, so it
+	// lumbers and spreads out from its spawn heading rather than wheeling straight onto a target.
 	bulwark: {
 		name: 'Bulwark',
 		sprite: 'ships/bulwark.png',
 		width: 20, height: 16,
-		speed: 50, steerForce: 5, steerBonus: 0.3,
+		speed: 50, steerForce: 2.5, steerBonus: 0.2,
 		baseShields: 6, contactDamage: 2, shieldsPerLevel: 2,
 		weapon: { range: 70, fireInterval: 1, projectileCount: 1, projectileSpeed: 200, damage: 1, projectileNoun: 'Bullet' },
-		unlockCost: 220, rateCostBase: 20, rateCostGrowth: 2, levelCostBase: 8, levelCostGrowth: 2,
+		killReward: 5,
+		unlockCost: 220, ...tierEconomy(220),
 	},
 	// 7. Wasp Interceptor - rapid swarm skirmisher: very fast and tiny, rapid short-range pellets, no shields.
 	wasp: {
@@ -275,17 +337,19 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		speed: 140, steerForce: 14, steerBonus: 0.6,
 		baseShields: 0, contactDamage: 0,
 		weapon: { range: 60, fireInterval: 0.25, projectileCount: 1, projectileSpeed: 220, damage: 1, projectileNoun: 'Pellet' },
-		unlockCost: 90, ...ECONOMY,
+		killReward: 2,
+		unlockCost: 90, ...tierEconomy(90),
 	},
 	// 8. Scatter Gun - shotgun / anti-swarm: many low-damage pellets in a spread, short range, one shield to start.
 	scatterGun: {
 		name: 'Scatter Gun',
 		sprite: 'ships/scatter-gun.png',
 		width: 14, height: 10,
-		speed: 70, steerForce: 7, steerBonus: 0.5,
+		speed: 70, steerForce: 7, steerBonus: 0.1,
 		baseShields: 1, contactDamage: 0,
 		weapon: { range: 80, fireInterval: 0.9, projectileCount: 5, spread: 0.5, projectileSpeed: 200, damage: 1, projectileNoun: 'Pellet' },
-		unlockCost: 140, ...ECONOMY,
+		killReward: 3,
+		unlockCost: 140, ...tierEconomy(140),
 	},
 	// 9. Stormcaller - chain / multi-hit arc: short range, its volley of three short-range homing arcs each seeks a
 	// target, approximating a shot that hits several nearby enemies at once.  Medium shields.
@@ -293,20 +357,24 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		name: 'Stormcaller',
 		sprite: 'ships/stormcaller.png',
 		width: 14, height: 12,
-		speed: 65, steerForce: 6, steerBonus: 0.5,
+		speed: 65, steerForce: 1, steerBonus: 0.5,
 		baseShields: 2, contactDamage: 0,
 		weapon: { range: 90, fireInterval: 1.1, projectileCount: 3, spread: 0.8, projectileSpeed: 240, damage: 1, homing: true, homingTurn: 45, projectileNoun: 'Arc' },
-		unlockCost: 260, rateCostBase: 20, rateCostGrowth: 2, levelCostBase: 10, levelCostGrowth: 2,
+		killReward: 5,
+		unlockCost: 260, ...tierEconomy(260),
 	},
 	// 10. Carrier - spawner: big, slow, some shields; its "weapon" periodically launches tiny drone sub-ships
-	// instead of projectiles (see weapon-update).  A mobile mini-station and force multiplier.
+	// instead of projectiles (see weapon-update), and levelling it grows that launch by a drone every third level.
+	// The biggest hull in the roster with the lowest steer force, so it turns ponderously and spreads well out from
+	// its spawn heading.
 	carrier: {
 		name: 'Carrier',
 		sprite: 'ships/carrier.png',
 		width: 24, height: 18,
-		speed: 40, steerForce: 4, steerBonus: 0.3,
-		baseShields: 3, contactDamage: 0, shieldsPerLevel: 2,
+		speed: 40, steerForce: 0.5, steerBonus: 0.03,
+		baseShields: 3, contactDamage: 0, shieldsPerLevel: 2, levelsPerDrone: 3,
 		weapon: { range: 220, fireInterval: 2.5, projectileCount: 2, spread: 0.6, projectileSpeed: 120, damage: 0, spawnsDrones: true },
-		unlockCost: 400, rateCostBase: 40, rateCostGrowth: 2, levelCostBase: 20, levelCostGrowth: 2,
+		killReward: 8,
+		unlockCost: 400, ...tierEconomy(400),
 	},
 };

@@ -22,11 +22,23 @@ import type { ComponentDefinition } from '@daneren2005/shared-memory-ecs';
 // (Railgun, Missile Frigate) sets a bigger `searchRange` so it can acquire targets as far out as it can shoot.
 export const DEFAULT_SEARCH_RANGE = 150;
 
-// Block layout (Float32Array, size 4).
+// How long a strafing ship slides one way before reversing, in seconds - so it weaves back and forth across its
+// target's front rather than committing to one direction (the Missile Frigate).  Read by move-to-target.
+export const STRAFE_LEG_SECONDS = 1.4;
+
+// Block layout (Float32Array, size 7).
 export const ATTACK_TARGET = 0;
 export const ATTACK_STEER_FORCE = 1;
 export const ATTACK_SPEED = 2;
 export const ATTACK_SEARCH_RANGE = 3;
+// The distance at which an armed ship stops charging and holds so it can fire (its weapon range); 0 for a rammer,
+// which keeps closing to make contact.  See move-to-target.
+export const ATTACK_STANDOFF_RANGE = 4;
+// Whether, once inside standoff range, the ship strafes side-to-side instead of holding still (config, 0/1).
+export const ATTACK_STRAFE = 5;
+// Runtime strafe state: sign is the lateral direction it is currently sliding, magnitude is how many seconds it
+// has been on this leg.  Only touched by move-to-target, on the one thread that steers, so a plain read is fine.
+export const ATTACK_STRAFE_TIMER = 6;
 
 export interface AttackComponent {
 	index: number
@@ -34,6 +46,9 @@ export interface AttackComponent {
 	steerForce: number
 	speed: number
 	searchRange: number
+	standoffRange: number
+	strafe: boolean
+	strafeTimer: number
 }
 export interface AttackConfig {
 	attacks: boolean
@@ -41,17 +56,27 @@ export interface AttackConfig {
 	steerForceBonus?: number
 	speed: number
 	searchRange?: number
+	// The range an armed ship holds at once it can fire; omitted (0) for a rammer, which closes all the way.
+	standoffRange?: number
+	// Whether the ship strafes across its target instead of holding still once in range (the Missile Frigate).
+	strafe?: boolean
 }
 export const attackDefinition: ComponentDefinition<AttackComponent, Float32Array, AttackConfig> = {
 	type: Float32Array,
-	size: 4,
+	size: 7,
 	loadProperties: ['attacks'],
 	load(entity, memory, config) {
+		const strafe = config.strafe ? 1 : 0;
 		const index = memory.create([
 			0,
 			rollSteerForce(config.steerForce, config.steerForceBonus),
 			config.speed,
 			config.searchRange ?? DEFAULT_SEARCH_RANGE,
+			config.standoffRange ?? 0,
+			strafe,
+			// Seed each strafer a random side and leg offset so a batch of them weaves out of phase rather than
+			// sliding in lockstep; a non-strafer never reads this.
+			strafe ? (Math.random() < 0.5 ? -1 : 1) * Math.random() * STRAFE_LEG_SECONDS : 0,
 		]);
 		const block = memory.getBlock(index);
 
@@ -80,6 +105,24 @@ export const attackDefinition: ComponentDefinition<AttackComponent, Float32Array
 			},
 			set searchRange(value: number) {
 				block[ATTACK_SEARCH_RANGE] = value;
+			},
+			get standoffRange() {
+				return block[ATTACK_STANDOFF_RANGE];
+			},
+			set standoffRange(value: number) {
+				block[ATTACK_STANDOFF_RANGE] = value;
+			},
+			get strafe() {
+				return block[ATTACK_STRAFE] === 1;
+			},
+			set strafe(value: boolean) {
+				block[ATTACK_STRAFE] = value ? 1 : 0;
+			},
+			get strafeTimer() {
+				return block[ATTACK_STRAFE_TIMER];
+			},
+			set strafeTimer(value: number) {
+				block[ATTACK_STRAFE_TIMER] = value;
 			},
 		};
 	},

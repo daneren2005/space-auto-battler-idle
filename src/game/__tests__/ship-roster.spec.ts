@@ -10,6 +10,7 @@ import {
 	shieldsForLevel, contactDamageForLevel, weaponDamageForLevel,
 } from '@/data/ship-types';
 import { makeShipConfig } from '@/data/entities/ship';
+import { DETONATED_EVENT } from '../components/combat';
 
 const RED = 0xff0000;
 const BLUE = 0x0000ff;
@@ -158,6 +159,30 @@ describe('Detonator contact detonation', () => {
 		expect(world.getEntityByEid(farEid)).toBeDefined();
 		// Three ships killed by the blast, all credited to the Detonator's faction.
 		expect(redStation.components.controller!.money).toBe(3);
+	});
+
+	it('announces the blast so the render side can draw the AoE', async () => {
+		world = await loadTwoStations();
+		const redStation = entityList(world)[0];
+		const blueStation = entityList(world)[1];
+
+		// A Detonator on top of a single enemy: it goes off, and fires DETONATED_EVENT on itself carrying where it
+		// blew and how far it reached - which is what the scene listens for to size the explosion to the AoE.
+		const detonator = world.loadEntity({ type: 'detonator', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION });
+		world.loadEntity({ type: 'skiff', x: 200, y: 200, owner: blueStation.eid, ...BLUE_FACTION, contactDamage: 0, maxShields: 1, timeToRegenerateShields: 1000 });
+
+		const blasts: Array<{ x: number, y: number, radius: number }> = [];
+		detonator.on(DETONATED_EVENT, (x: number, y: number, radius: number) => blasts.push({ x, y, radius }));
+
+		// One frame past the damage cooldown, so the blast lands as the bodies overlap.
+		world.update(250);
+
+		// Fired exactly once - the Detonator is consumed by its own blast - and carrying the type's 40px blast radius
+		// at a real point on the map, so the scene has everything it needs to place and size the explosion.
+		expect(blasts).toHaveLength(1);
+		expect(blasts[0].radius).toBe(40);
+		expect(Number.isFinite(blasts[0].x)).toBe(true);
+		expect(Number.isFinite(blasts[0].y)).toBe(true);
 	});
 });
 

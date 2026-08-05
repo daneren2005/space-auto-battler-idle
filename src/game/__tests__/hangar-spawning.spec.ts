@@ -88,6 +88,19 @@ describe('hangar multi-type spawning', () => {
 		expect(gunner.components.weapon!.damage).toBe(1);
 	});
 
+	it('stamps a Carrier with the drone count of its line\'s level, so a levelled swarm grows', async () => {
+		// The Carrier launches two drones a volley at its base, and one more every third level - so a level-4 line
+		// stamps three onto every Carrier it builds.  A single faction means no enemy to fire at, so the Carrier
+		// simply carries the stamped count without ever launching, which is exactly what we read off it.
+		world = await loadStation({ carrier: { rate: 1, level: 4 } });
+
+		world.update(1_000);
+
+		const carrier = shipsOfWidth(world, SHIP_TYPE_DEFS.carrier.width)[0];
+		expect(carrier).toBeDefined();
+		expect(carrier.components.weapon!.projectileCount).toBe(3);
+	});
+
 	it('banks each line\'s spawn progress independently', async () => {
 		// Skiffs at 4/s and Gunners at 1/s, stepped a quarter-second at a time: the Skiff line earns a whole ship
 		// every frame while the Gunner line only banks a quarter of one, so the first frame launches a Skiff and no

@@ -31,6 +31,8 @@ for(const type of SHIP_TYPES) {
 	roster[type] = { rate: RATE_PER_TYPE, level: LEVEL_PER_TYPE };
 }
 
+// roster['detonator'] = { rate: 1, level: 1};
+
 // The player holds the left edge and the enemy the right, both vertically centred, so the fleets meet across the
 // middle of the wide field.
 export const shipTestLevel: LevelConfig = {

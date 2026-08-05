@@ -38,16 +38,28 @@ function hangarBlock(gameWorld: GameWorld) {
 
 describe('upgrade cost curves', () => {
 	it('grows the rate and level cost exponentially from the def base', () => {
-		// The Gunner uses the shared economy: rate 10 x2, level 5 x2.
+		// The Gunner's bases are anchored to its 40 unlock cost: rate 40 x2, level 20 x2.
 		const gunner = SHIP_TYPE_DEFS.gunner;
-		expect(rateCost(gunner, 0)).toBe(10);
-		expect(rateCost(gunner, 1)).toBe(20);
-		expect(rateCost(gunner, 3)).toBe(80);
-		expect(levelCost(gunner, 0)).toBe(5);
-		expect(levelCost(gunner, 2)).toBe(20);
+		expect(rateCost(gunner, 0)).toBe(40);
+		expect(rateCost(gunner, 1)).toBe(80);
+		expect(rateCost(gunner, 3)).toBe(320);
+		expect(levelCost(gunner, 0)).toBe(20);
+		expect(levelCost(gunner, 2)).toBe(80);
 		// The unlock cost is a flat one-off straight off the def.
 		expect(unlockCost(gunner)).toBe(gunner.unlockCost);
 		expect(unlockCost(SHIP_TYPE_DEFS.skiff)).toBe(0);
+	});
+
+	it('never prices a freshly unlocked type\'s first upgrade below its unlock cost', () => {
+		// Unlocking leaves both bought counters at 1, so the first upgrade the player can buy is priced at bought 1.
+		// Every unlockable type's cheapest first upgrade must cost at least what it took to unlock it.
+		for(const def of Object.values(SHIP_TYPE_DEFS)) {
+			if(def.unlockCost === 0) {
+				continue;
+			}
+			const firstUpgrade = Math.min(rateCost(def, 1), levelCost(def, 1));
+			expect(firstUpgrade).toBeGreaterThanOrEqual(def.unlockCost);
+		}
 	});
 });
 

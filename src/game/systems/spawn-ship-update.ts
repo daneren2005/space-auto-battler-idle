@@ -3,7 +3,7 @@ import type { EntityUpdateFunction } from '@daneren2005/shared-memory-ecs';
 import { TRANSFORM_X_INDEX, TRANSFORM_Y_INDEX, BODY_CATEGORY_INDEX, BODY_MASK_INDEX } from '@daneren2005/shared-memory-physics';
 import type { Components, ComponentArrays } from '../components';
 import computeAngle from '@/math/compute-angle';
-import { SHIP_TYPES, SHIP_TYPE_INDEX, SHIP_TYPE_DEFS, shieldsForLevel, contactDamageForLevel, weaponDamageForLevel } from '@/data/ship-types';
+import { SHIP_TYPES, SHIP_TYPE_INDEX, SHIP_TYPE_DEFS, shieldsForLevel, contactDamageForLevel, weaponDamageForLevel, droneCountForLevel } from '@/data/ship-types';
 import { hangarRateIndex, hangarLevelIndex, hangarProgressIndex } from '../components/hangar';
 
 // Magnitude of a freshly-spawned ship's random initial velocity, in pixels/second.
@@ -64,6 +64,9 @@ export const spawnShipUpdate: EntityUpdateFunction<Components, Pick<ComponentArr
 		const contactDamage = contactDamageForLevel(def, level);
 		// An armed type has its per-shot weapon damage stamped from the same level curve; a rammer leaves it unset.
 		const weaponDamage = def.weapon ? weaponDamageForLevel(def, level) : undefined;
+		// A drone-spawner (the Carrier) has its volley's drone count stamped from the level curve too, so a levelled
+		// station launches the bigger swarm; every other type keeps its fixed shot count.
+		const weaponProjectileCount = def.weapon?.spawnsDrones ? droneCountForLevel(def, level) : undefined;
 
 		for(let i = 0; i < spawning; i++) {
 			// Rolled per ship, so a batch leaves the station as a spread rather than as one stack flying in convoy.
@@ -81,6 +84,7 @@ export const spawnShipUpdate: EntityUpdateFunction<Components, Pick<ComponentArr
 				maxShields,
 				contactDamage,
 				weaponDamage,
+				weaponProjectileCount,
 				collideCategory,
 				collideMask,
 			}, callbacks);

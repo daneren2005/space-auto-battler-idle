@@ -56,6 +56,9 @@ export interface WeaponConfig {
 	// A per-spawn override of the weapon's per-shot damage, so the spawn worker can stamp the level-scaled value
 	// without rewriting the whole nested `weapon` object.  Falls back to the weapon's own `damage` when absent.
 	weaponDamage?: number
+	// A per-spawn override of the volley's shot/drone count, likewise stamped by the spawn worker for a type whose
+	// count scales with level (the Carrier's drone swarm).  Falls back to the weapon's own count when absent.
+	weaponProjectileCount?: number
 }
 export const weaponDefinition: ComponentDefinition<WeaponComponent, Float32Array, WeaponConfig> = {
 	type: Float32Array,
@@ -66,7 +69,9 @@ export const weaponDefinition: ComponentDefinition<WeaponComponent, Float32Array
 		const index = memory.create([
 			weapon.range,
 			weapon.fireInterval,
-			weapon.projectileCount ?? 1,
+			// The spawn worker stamps the level-scaled count here (the Carrier's drones); a directly-placed ship uses
+			// the def's own.
+			config.weaponProjectileCount ?? weapon.projectileCount ?? 1,
 			weapon.spread ?? 0,
 			weapon.projectileSpeed,
 			// The spawn worker stamps the level-scaled per-shot damage here; a directly-placed ship uses the def's own.

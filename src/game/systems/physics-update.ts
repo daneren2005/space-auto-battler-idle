@@ -27,7 +27,7 @@ import computeAngle from '@/math/compute-angle';
 import { HEALTH_SHIELDS, HEALTH_TIME_SINCE_DAMAGE, HEALTH_DAMAGE_COOLDOWN } from '../components/health';
 import { CONTROLLER_MONEY } from '../components/controller';
 import { CONTROLLED_OWNER } from '../components/controlled';
-import { COMBAT_CONTACT_DAMAGE, COMBAT_BLAST_RADIUS } from '../components/combat';
+import { COMBAT_CONTACT_DAMAGE, COMBAT_BLAST_RADIUS, COMBAT_BOUNTY, DETONATED_EVENT } from '../components/combat';
 
 // The blocks this update hands its collision callback: the transform + velocity physics moves, the body it
 // filters on, and the four game components a collision reads or writes.  Everything past the transform is
@@ -61,6 +61,7 @@ interface CollidableBlocks {
 	transform?: Float32Array
 	health?: Float32Array
 	body?: Uint32Array
+	combat?: Float32Array
 }
 let blocksByEid: Record<number, CollidableBlocks> = {};
 // Every collidable entity's eid, so a detonation can sweep them for who is inside its blast radius.
@@ -127,6 +128,7 @@ export const physicsUpdate: PhysicsUpdateFunction<Components, GamePhysicsCompone
 					transform: components.transform,
 					health: components.health,
 					body: components.body,
+					combat: components.combat,
 				};
 				collidableEids.push(entity.entityId);
 
@@ -226,7 +228,7 @@ function projectileHit(self: MovingEntity<GamePhysicsComponents>, other: Collisi
 		return;
 	}
 
-	const otherWorth = other.components.controller ? shipsByStation[other.entityId]?.length ?? 0 : 1;
+	const otherWorth = other.components.controller ? stationWorth(other.entityId) : shipWorth(other.components.combat);
 	takeDamage(other, contactDamageOf(self), callbacks);
 	if(isDead(other)) {
 		creditMoney(ownerOf(self), otherWorth);
@@ -284,12 +286,17 @@ function detonate(self: MovingEntity<GamePhysicsComponents>, callbacks: Componen
 				continue;
 			}
 
-			// A station is worth its whole fleet, a ship worth one - counted before the hit, while that fleet is alive.
-			const worth = blocks.controller ? shipsByStation[eid]?.length ?? 0 : 1;
+			// A station is worth its whole fleet, a ship its own bounty - counted before the hit, while that fleet is alive.
+			const worth = blocks.controller ? stationWorth(eid) : shipWorth(blocks.combat);
 			if(damageEid(eid, damage, callbacks)) {
 				creditMoney(attackerOwner, worth);
 			}
 		}
+
+		// Tell the render side to draw the blast over the AoE it just dealt.  Emitted before the kill below so the
+		// detonator is still alive when the event reaches the main thread (the events for a run flush in order, and
+		// the kill's own death event - which removes the entity - is queued after this one).
+		callbacks.emitEntityEvent(self.entityId, DETONATED_EVENT, sx, sy, radius);
 	}
 
 	kill(self.entityId, self.components.entity, callbacks);
@@ -332,9 +339,9 @@ function exchangeDamage(self: Combatant, other: Combatant, callbacks: ComponentS
 		return;
 	}
 
-	// A station is worth its whole fleet as a kill reward; a ship is worth one.  Counted before the damage lands,
-	// while that fleet is still alive.
-	const otherWorth = other.components.controller ? shipsByStation[other.entityId]?.length ?? 0 : 1;
+	// A station is worth its whole fleet as a kill reward; a ship is worth its own bounty.  Counted before the
+	// damage lands, while that fleet is still alive.
+	const otherWorth = other.components.controller ? stationWorth(other.entityId) : shipWorth(other.components.combat);
 
 	// Each side removes its own contact damage from the other; a combatant with no combat block (a station) falls
 	// back to one, which is what the ram used to deal flat.
@@ -346,8 +353,8 @@ function exchangeDamage(self: Combatant, other: Combatant, callbacks: ComponentS
 		creditMoney(ownerOf(self), otherWorth);
 	}
 	if(isDead(self)) {
-		// whatever killed self earns the reward for the ship (worth one).
-		creditMoney(ownerOf(other), 1);
+		// whatever killed self earns the reward - self is a ship, so its own bounty.
+		creditMoney(ownerOf(other), shipWorth(self.components.combat));
 	}
 }
 
@@ -402,6 +409,24 @@ function ownerOf(combatant: Combatant): number | undefined {
 
 	const controlled = combatant.components.controlled;
 	return controlled ? controlled[CONTROLLED_OWNER] : undefined;
+}
+
+// What killing one ship is worth: the bounty stamped on its combat block at spawn, which scales with the ship
+// type's price (see data/ship-types.ts).  Anything killable without a combat block (there is none in practice)
+// falls back to the flat one every ship used to be worth.
+function shipWorth(combat: Float32Array | undefined): number {
+	return combat ? combat[COMBAT_BOUNTY] : 1;
+}
+
+// What destroying a station is worth: the sum of its living fleet's bounties, since a station falling takes every
+// ship it owns down with it.  A pricier fleet is worth more than a cheap one of the same size, matching the
+// per-ship reward.  Counted off the fleet gathered in preRun, while it is all still alive.
+function stationWorth(stationEid: number): number {
+	let total = 0;
+	for(const shipEid of shipsByStation[stationEid] ?? []) {
+		total += shipWorth(blocksByEid[shipEid]?.combat);
+	}
+	return total;
 }
 
 // Credit a faction's kill-reward `money`.  Only the player ever spends it, but it is tracked for everyone.

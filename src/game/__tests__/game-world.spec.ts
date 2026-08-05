@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import GameWorld from '../entities/game-world';
 import entityList from '../entities/entity-list';
 import { factionCollision } from '@/data/collide-categories';
-import { SHIP_TYPE_INDEX } from '@/data/ship-types';
+import { SHIP_TYPE_INDEX, SHIP_TYPE_DEFS, killReward } from '@/data/ship-types';
 
 // Two distinct station colours.  Ships inherit their owning station's colour, and targeting only ever picks a
 // different-coloured entity, so these pick who hunts whom.
@@ -255,6 +255,56 @@ describe('GameWorld game loop', () => {
 		expect(blueStation.components.controller!.money).toBe(0);
 		// Red traded two of its three shields (one per exchange) to land the kill.
 		expect(survivor!.components.health!.shields).toBe(1);
+	});
+
+	it('stamps each ship with its type\'s kill reward', async () => {
+		world = new GameWorld();
+		world.load({
+			bounds: { width: 400, height: 400 },
+			entities: [{ type: 'station', color: RED, ...RED_FACTION, x: 20, y: 20 }],
+		});
+		await world.init();
+
+		const station = entityList(world)[0];
+		// A directly-placed ship inherits its type's bounty from the template, so a pricier hull is worth more to kill
+		// than a Skiff without anything having to pass the reward in per spawn.
+		const skiff = world.loadEntity({ type: 'skiff', x: 100, y: 100, owner: station.eid, ...RED_FACTION });
+		const carrier = world.loadEntity({ type: 'carrier', x: 200, y: 200, owner: station.eid, ...RED_FACTION });
+
+		expect(skiff.components.combat!.bounty).toBe(killReward(SHIP_TYPE_DEFS.skiff));
+		expect(carrier.components.combat!.bounty).toBe(killReward(SHIP_TYPE_DEFS.carrier));
+		expect(carrier.components.combat!.bounty).toBeGreaterThan(skiff.components.combat!.bounty);
+	});
+
+	it('pays the killer the dead ship\'s bounty, so a pricier kill is worth more', async () => {
+		world = new GameWorld();
+		world.load({
+			bounds: { width: 400, height: 400 },
+			entities: [
+				{ type: 'station', color: RED, ...RED_FACTION, x: 20, y: 20 },
+				{ type: 'station', color: BLUE, ...BLUE_FACTION, x: 380, y: 380 },
+			],
+		});
+		await world.init();
+
+		const redStation = entityList(world)[0];
+		const blueStation = entityList(world)[1];
+
+		// The same overlapping stand-off as above, but the doomed blue ship carries a hand-set bounty of 5 - so the
+		// win pays that, not the flat one a Skiff used to be worth, exercising the reward being read off the kill.
+		const red = world.loadEntity({ type: 'skiff', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION, maxShields: 3, timeToRegenerateShields: 1000 });
+		const blue = world.loadEntity({ type: 'skiff', x: 200, y: 200, owner: blueStation.eid, ...BLUE_FACTION, maxShields: 1, bounty: 5, timeToRegenerateShields: 1000 });
+		const redEid = red.eid;
+		const blueEid = blue.eid;
+
+		for(let i = 0; i < 40 && world.getEntityByEid(blueEid); i++) {
+			world.update(250);
+		}
+
+		expect(world.getEntityByEid(blueEid)).toBeUndefined();
+		expect(world.getEntityByEid(redEid)).toBeDefined();
+		// The winner earned the dead ship's bounty rather than a flat one.
+		expect(redStation.components.controller!.money).toBe(5);
 	});
 
 	it('removes a ship\'s own contact damage on a ram rather than a flat one', async () => {

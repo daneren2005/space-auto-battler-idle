@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SHIP_TYPE_DEFS, combatStat, nextLevelSummary } from '../ship-types';
+import { SHIP_TYPE_DEFS, combatStat, nextLevelSummary, killReward, unlockCost } from '../ship-types';
 
 describe('combatStat', () => {
 	it('names an armed ship\'s damage by its own projectile noun', () => {
@@ -14,10 +14,11 @@ describe('combatStat', () => {
 		expect(combatStat(SHIP_TYPE_DEFS.gunner, 5).value).toBe(2);
 	});
 
-	it('describes a Carrier by how many drones each launch fields, not damage', () => {
+	it('describes a Carrier by how many drones each launch fields, growing that swarm with level', () => {
 		expect(combatStat(SHIP_TYPE_DEFS.carrier, 1)).toEqual({ label: 'Drones/launch', value: 2 });
-		// A Carrier's drones fly at fixed stats, so the number does not move with level.
-		expect(combatStat(SHIP_TYPE_DEFS.carrier, 9).value).toBe(2);
+		// Every third level past the first adds a drone to the launch, so the count climbs off its base of 2.
+		expect(combatStat(SHIP_TYPE_DEFS.carrier, 4).value).toBe(3);
+		expect(combatStat(SHIP_TYPE_DEFS.carrier, 7).value).toBe(4);
 	});
 
 	it('shows a Detonator\'s blast and a Skiff\'s ram for the unarmed types', () => {
@@ -40,7 +41,34 @@ describe('nextLevelSummary', () => {
 		expect(nextLevelSummary(SHIP_TYPE_DEFS.gunner, 4)).toBe('+1 shield, +1 damage');
 	});
 
-	it('never promises a Carrier damage, since its drones do not scale', () => {
+	it('promises a Carrier extra drones on the level that adds one, never damage', () => {
+		// Its swarm grows every third level, so the 3->4 buy adds a drone while the 4->5 buy is only shields.
+		expect(nextLevelSummary(SHIP_TYPE_DEFS.carrier, 3)).toBe('+2 shields, +1 drone');
 		expect(nextLevelSummary(SHIP_TYPE_DEFS.carrier, 4)).toBe('+2 shields');
+	});
+});
+
+describe('killReward', () => {
+	it('is worth more for a pricier ship than the cheap Skiff', () => {
+		// The Skiff is the disposable starter and pays the flat one; the Carrier, the roster's most expensive hull,
+		// is worth the most to kill.
+		expect(killReward(SHIP_TYPE_DEFS.skiff)).toBe(1);
+		expect(killReward(SHIP_TYPE_DEFS.carrier)).toBeGreaterThan(killReward(SHIP_TYPE_DEFS.gunner));
+		expect(killReward(SHIP_TYPE_DEFS.gunner)).toBeGreaterThan(killReward(SHIP_TYPE_DEFS.skiff));
+	});
+
+	it('is a positive whole number for every type, so it can be added to the integer money bank', () => {
+		for(const def of Object.values(SHIP_TYPE_DEFS)) {
+			expect(Number.isInteger(killReward(def))).toBe(true);
+			expect(killReward(def)).toBeGreaterThan(0);
+		}
+	});
+
+	it('never pays out less for a type than a cheaper one to unlock', () => {
+		// The reward tracks a type's price, so ordering types by unlock cost never sees the bounty go backwards.
+		const byPrice = Object.values(SHIP_TYPE_DEFS).sort((a, b) => unlockCost(a) - unlockCost(b));
+		for(let i = 1; i < byPrice.length; i++) {
+			expect(killReward(byPrice[i])).toBeGreaterThanOrEqual(killReward(byPrice[i - 1]));
+		}
 	});
 });

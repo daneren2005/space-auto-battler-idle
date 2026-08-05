@@ -24,6 +24,9 @@ export function makeShipConfig(type: ShipType): Config {
 		width: def.width, height: def.height,
 		speed: def.speed, steerForce: def.steerForce, steerForceBonus: def.steerBonus,
 		maxShields: def.baseShields, contactDamage: def.contactDamage,
+		// Its kill reward is fixed per type (it does not move with level), so it rides on the template and every
+		// ship a station spawns inherits it - the spawn config only overrides what a level changes.
+		bounty: def.killReward,
 		searchRange: Math.max(DEFAULT_SEARCH_RANGE, def.weapon?.range ?? 0),
 		timeToRegenerateShields: 1, damageCooldown: 0.2,
 		velocityX: 0, attacks: true, interpolate: true, bounciness: 1,
@@ -34,6 +37,13 @@ export function makeShipConfig(type: ShipType): Config {
 	}
 	if(def.weapon) {
 		config.weapon = def.weapon;
+		// An armed ship stops charging and holds at its weapon range so it fights from a distance rather than
+		// ramming; a strafer weaves across that range instead of freezing (see move-to-target).  A rammer has no
+		// weapon and so no standoff - it keeps closing to make contact.
+		config.standoffRange = def.weapon.range;
+		if(def.weapon.strafe) {
+			config.strafe = true;
+		}
 	}
 
 	return config;

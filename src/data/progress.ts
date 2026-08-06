@@ -1,6 +1,6 @@
-// Persistent meta-progress: which level the player is on and the upgrades / money they carry into it.  Levels
-// are advanced by a page reload (see the win/lose dialog), so this small localStorage record is what survives
-// the reload and lets earlier upgrades carry over.
+// Persistent meta-progress: which level the player is on and the upgrades / money they carry into it.  The game
+// changes level in place as matches are decided (see GameScene), but it still writes this small localStorage
+// record on every jump so closing and reopening the tab resumes at the right level with the earned upgrades.
 
 import { SHIP_TYPES, type ShipType } from '@/data/ship-types';
 
@@ -94,4 +94,28 @@ export function resetProgress(): void {
 	} catch{
 		// Nothing to do if storage is unavailable.
 	}
+}
+
+// Whether the finished match was won or lost by the player.
+export type MatchOutcome = 'won' | 'lost';
+
+// Decides what to persist when a match ends, given this level's index in the play order, the next level's index
+// (or -1 when there is none), and the progress the player finished the match holding.  A win advances to the next
+// level, or resets the run once the last level is cleared.  A loss drops *back* a level (never below the first) -
+// so a run left to idle keeps banking kill money on a level it can still clear, gathering the upgrades it needs to
+// push at the wall again, instead of stalling on a level it cannot yet beat.  Either way the money and upgrades the
+// player *ended the match with* carry forward, so each attempt resumes stronger than the last.  `'reset'` means
+// wipe the save back to a fresh run.
+export function progressAfterMatch(
+	outcome: MatchOutcome,
+	levelIndex: number,
+	nextLevelIndex: number,
+	carry: Carry,
+): Progress | 'reset' {
+	if(outcome === 'won') {
+		return nextLevelIndex >= 0 ? { levelIndex: nextLevelIndex, carry } : 'reset';
+	}
+	// Lost: fall back a level, carrying forward everything earned in the failed run.  Level 0 has nowhere further
+	// back to go, so a loss there simply replays it.
+	return { levelIndex: Math.max(0, levelIndex - 1), carry };
 }

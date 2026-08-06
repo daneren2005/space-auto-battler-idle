@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { loadProgress, saveProgress, resetProgress, emptyCarry } from '../progress';
+import { loadProgress, saveProgress, resetProgress, emptyCarry, progressAfterMatch } from '../progress';
+import type { Carry } from '../progress';
 import { levels, firstLevel, getLevel, getLevelIndex } from '../levels';
 import { PLAYER_START_SHIPS } from '../levels/player-start';
 
@@ -59,6 +60,34 @@ describe('progress', () => {
 	});
 });
 
+describe('progressAfterMatch', () => {
+	const carry: Carry = { money: 40, ships: { skiff: { rate: 3, level: 2 } } };
+
+	it('advances a win to the next level carrying the earned upgrades and money forward', () => {
+		expect(progressAfterMatch('won', 1, 2, carry)).toEqual({ levelIndex: 2, carry });
+	});
+
+	it('resets the run when the last level is won (no next level)', () => {
+		expect(progressAfterMatch('won', 5, -1, carry)).toBe('reset');
+	});
+
+	it('drops back a level on a loss, keeping the money and upgrades the player died with', () => {
+		// A loss falls back to the previous level (index 3 -> 2) carrying forward the money / upgrades the player
+		// ended the failed attempt with - so an idle run keeps banking money on a level it can still clear rather
+		// than stalling on the wall, and each attempt resumes stronger.
+		expect(progressAfterMatch('lost', 3, 4, carry)).toEqual({ levelIndex: 2, carry });
+	});
+
+	it('falls back regardless of whether this level has a next one', () => {
+		// The next-level index is irrelevant to a loss; it always steps one level back.
+		expect(progressAfterMatch('lost', 5, -1, carry)).toEqual({ levelIndex: 4, carry });
+	});
+
+	it('holds on the first level when a loss has nowhere further back to go', () => {
+		expect(progressAfterMatch('lost', 0, 1, carry)).toEqual({ levelIndex: 0, carry });
+	});
+});
+
 describe('levels', () => {
 	it('chains level 1 into level 2', () => {
 		expect(firstLevel.name).toBe('level-1');
@@ -103,23 +132,29 @@ describe('levels', () => {
 		expect(enemiesEscalate).toBe(true);
 	});
 
-	it('places the player at the bottom and the enemy at the top, both horizontally centred', () => {
+	it('holds the player at the bottom centre and every enemy up top', () => {
 		levels.forEach(level => {
 			const stations = level.entities.filter(entity => entity.type === 'station');
-			expect(stations).toHaveLength(2);
+			const players = stations.filter(station => station.player);
+			const enemies = stations.filter(station => !station.player);
 
+			// One player station, on the horizontal centre line at the bottom edge (nearest the upgrade buttons).
+			expect(players).toHaveLength(1);
 			const midX = level.bounds.width / 2;
-			stations.forEach(station => {
-				// Both factions sit on the horizontal centre line so their fleets meet in the middle.
-				expect(station.x).toBe(midX);
-			});
-
-			// The player holds the bottom edge (nearest the upgrade buttons); the enemy holds the top.
 			const midY = level.bounds.height / 2;
-			const player = stations.find(station => station.player);
-			const enemy = stations.find(station => !station.player);
-			expect(player?.y).toBeGreaterThan(midY);
-			expect(enemy?.y).toBeLessThan(midY);
+			expect(players[0].x).toBe(midX);
+			expect(players[0].y).toBeGreaterThan(midY);
+
+			// One or more enemy stations, all across the top half - a single centre station in the early 1v1 levels,
+			// spread into flanks once a level fields two or three so pressure comes from several lanes at once.
+			expect(enemies.length).toBeGreaterThanOrEqual(1);
+			enemies.forEach(enemy => {
+				expect(enemy.y).toBeLessThan(midY);
+			});
+			// A lone enemy still sits dead centre, facing the player down the middle.
+			if(enemies.length === 1) {
+				expect(enemies[0].x).toBe(midX);
+			}
 		});
 	});
 });

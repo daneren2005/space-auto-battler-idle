@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type GameScene from './game-scene';
-import type { GameState } from './game-scene';
+import type { LevelNotice } from './game-scene';
 import type ShipRoster from './ship-roster';
 import formatStats from './format-stats';
 import { HUD_TOP_HEIGHT, HUD_BOTTOM_HEIGHT } from './display';
@@ -55,6 +55,9 @@ interface Chip {
 const AFFORD_TINT = 0xffffff;
 const DENY_TINT = 0x8899aa;
 
+// How long a level-change toast stays up before it dismisses itself, in milliseconds.  A tap dismisses it sooner.
+const TOAST_DURATION = 10000;
+
 // The sci-fi HUD + menus, drawn as a second scene running on top of the game so it never gets cleared by the
 // simulation.  It is purely presentational: every frame it reads the GameScene's public getters (player money,
 // fleet size, the per-type ShipRoster) and reflects them, and its interactive controls - the fleet bar chips, the
@@ -101,11 +104,13 @@ export default class UIScene extends Phaser.Scene {
 	// unlock button and its ship icon without re-deriving which child is which (a cell now has two images).
 	private drawerCells: Array<{ type: ShipType, button: Phaser.GameObjects.Image, icon: Phaser.GameObjects.Image }> = [];
 
-	private dialog!: Phaser.GameObjects.Container;
-	private dialogTitle!: Phaser.GameObjects.BitmapText;
-	private dialogMessage!: Phaser.GameObjects.BitmapText;
-	private dialogButtonLabel!: Phaser.GameObjects.BitmapText;
-	private dialogShownFor: GameState = 'playing';
+	// A banner across the top of the play area announcing an automatic level jump (advanced on a win, dropped back on
+	// a loss - see GameScene).  It replaces the old win/lose dialog: the match resolves and reloads on its own, and
+	// this is shown on the level the reload lands on to tell the player what happened.  Auto-dismisses after
+	// TOAST_DURATION, or on a tap.
+	private toast!: Phaser.GameObjects.Container;
+	private toastText!: Phaser.GameObjects.BitmapText;
+	private toastTimer?: Phaser.Time.TimerEvent;
 
 	// Developer stats overlay, hidden until the player toggles it with the backtick (`) key.
 	private statsPanel!: Phaser.GameObjects.Container;
@@ -145,7 +150,7 @@ export default class UIScene extends Phaser.Scene {
 		this.buildFleetBar(height);
 		this.buildCard(width, height);
 		this.buildDrawer(width, height);
-		this.buildDialog(width, height);
+		this.buildToast(width);
 		this.buildStatsPanel(width);
 	}
 
@@ -165,9 +170,17 @@ export default class UIScene extends Phaser.Scene {
 			}
 		}
 
-		const state = this.gameScene.gameState;
-		if(state !== 'playing' && this.dialogShownFor !== state) {
-			this.showDialog(state);
+		// Once the match is decided the scene freezes and swaps levels on its own (see GameScene) - close the roster
+		// overlays so a stray tap in that brief window can't try to buy against a station that may already be gone.
+		if(this.gameScene.gameState !== 'playing') {
+			this.closeCard();
+			this.closeDrawer();
+		}
+
+		// A level jump leaves a one-line notice for the toast; show it the frame it appears.
+		const notice = this.gameScene.takeNotice();
+		if(notice) {
+			this.showToast(notice);
 		}
 
 		// Only spend the string-building work when the overlay is actually on screen.
@@ -244,7 +257,7 @@ export default class UIScene extends Phaser.Scene {
 
 	// The fleet bar is only draggable while no overlay is up and the gesture is in the bottom band it lives in.
 	private canDragFleetBar(pointer: Phaser.Input.Pointer, height: number): boolean {
-		return !this.card.visible && !this.drawer.visible && !this.dialog.visible
+		return !this.card.visible && !this.drawer.visible
 			&& pointer.y >= height - HUD_BOTTOM_HEIGHT;
 	}
 
@@ -530,49 +543,34 @@ export default class UIScene extends Phaser.Scene {
 		});
 	}
 
-	private buildDialog(width: number, height: number) {
-		const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x03060f, 0.72);
+	// --- Level-change toast ----------------------------------------------------------------------------------
 
-		const panel = this.add.image(0, 0, 'ui-window').setDisplaySize(520, 380);
-
-		this.dialogTitle = this.add.bitmapText(0, -134, FONT, '', 40).setOrigin(0.5).setCenterAlign();
-
-		this.dialogMessage = this.add.bitmapText(0, -20, FONT, '', 18)
-			.setOrigin(0.5).setCenterAlign().setMaxWidth(380).setTintFill(0xcfe6ff);
-
-		const button = this.add.image(0, 96, 'ui-button-green')
-			.setDisplaySize(240, 56)
+	// A banner pinned across the top of the play area, just under the money/fleet row so it never covers those
+	// readouts.  Built hidden; showToast fills and reveals it.  The background is interactive so a tap anywhere on
+	// the banner dismisses it early (the label on top isn't interactive, so taps fall through to the background).
+	private buildToast(width: number) {
+		const y = HUD_TOP_HEIGHT + 34;
+		const background = this.add.rectangle(0, 0, width - 48, 56, 0x0a1c33, 0.94)
+			.setStrokeStyle(2, 0x2f6ea5)
 			.setInteractive({ useHandCursor: true });
-		this.dialogButtonLabel = this.add.bitmapText(0, 96, FONT, '', 20).setOrigin(0.5).setCenterAlign().setTintFill(0xffffff);
-		button.on('pointerup', () => {
-			// The GameScene owns progression: advance + carry over on a win, retry on a loss (both via reload).
-			this.gameScene.dialogAction();
-		});
+		this.toastText = this.add.bitmapText(0, 0, FONT, '', 18)
+			.setOrigin(0.5).setCenterAlign().setMaxWidth(width - 96).setTintFill(0xcfe6ff);
 
-		this.dialog = this.add.container(width / 2, height / 2, [
-			overlay, panel, this.dialogTitle, this.dialogMessage, button, this.dialogButtonLabel,
-		]);
-		// The overlay was built at absolute coords for full-screen sizing; re-home it to the container origin.
-		overlay.setPosition(0, 0);
-		this.dialog.setDepth(100).setVisible(false);
+		this.toast = this.add.container(width / 2, y, [background, this.toastText]).setDepth(300).setVisible(false);
+		background.on('pointerup', () => this.hideToast());
 	}
 
-	private showDialog(state: GameState) {
-		this.dialogShownFor = state;
-		// A finished match freezes the roster UI behind the dialog so it can't be tapped through the overlay.
-		this.closeCard();
-		this.closeDrawer();
-		if(state === 'won') {
-			this.dialogTitle.setText('VICTORY').setTintFill(0x7cfc66);
-			const next = this.gameScene.hasNextLevel
-				? '\nYour fleet carries into the next battle.'
-				: '\nYou have cleared every level!';
-			this.dialogMessage.setText(`You cleared "${this.gameScene.levelTitle}".${next}`);
-		} else {
-			this.dialogTitle.setText('DEFEAT').setTintFill(0xff5a5a);
-			this.dialogMessage.setText('Your station was destroyed.\nRegroup and try again.');
-		}
-		this.dialogButtonLabel.setText(this.gameScene.dialogButtonLabel);
-		this.dialog.setVisible(true);
+	private showToast(notice: LevelNotice) {
+		this.toastText.setText(notice.message).setTintFill(notice.tone === 'good' ? 0x7cfc66 : 0xff8a8a);
+		this.toast.setVisible(true);
+		// Restart the countdown if a toast was somehow already up, so the newest message gets its full dwell.
+		this.toastTimer?.remove();
+		this.toastTimer = this.time.delayedCall(TOAST_DURATION, () => this.hideToast());
+	}
+
+	private hideToast() {
+		this.toastTimer?.remove();
+		this.toastTimer = undefined;
+		this.toast.setVisible(false);
 	}
 }

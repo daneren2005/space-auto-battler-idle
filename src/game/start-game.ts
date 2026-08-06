@@ -39,10 +39,18 @@ export default function startGame(options: StartGameOptions): Phaser.Game {
 		parent: 'phaser-container',
 		backgroundColor: '#05070f',
 		loader: {
-			// Sprites / fonts live in public/, which is served from the site's base path - but a scene asks for them
-			// by bare name ('boid.png'), which the loader would otherwise resolve against whatever page is open.  The
-			// stress test sits a directory deeper (/stress-test/), so without an explicit base its assets 404.
-			baseURL: import.meta.env.BASE_URL,
+			// Sprites / fonts live in public/, which is served from the deploy root - but a scene asks for them by
+			// bare name ('boid.png'), which the loader would otherwise resolve against whatever page is open.  The
+			// stress test and ship test sit a directory deeper (/stress-test/, /ship-test/), so without an explicit
+			// base their assets 404.  When BASE_URL is an absolute path (the dev server's '/', or a configured
+			// subpath) it already points at the deploy root.  The portable production build (base: '') makes it the
+			// relative './' instead, which would resolve against this chunk's own assets/ directory - so in that case
+			// walk one level up: bundled chunks always live in assets/, directly below the deploy root, wherever the
+			// site is hosted.
+			baseURL: new URL(
+				import.meta.env.BASE_URL.startsWith('/') ? import.meta.env.BASE_URL : '../',
+				import.meta.url,
+			).href,
 		},
 		scale: {
 			mode: Phaser.Scale.FIT,

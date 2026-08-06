@@ -23,6 +23,7 @@ export const level2: LevelConfig = {
 	name: 'level-2',
 	title: 'Escalation',
 	bounds: { width: WIDTH, height: HEIGHT },
+	nextLevel: 'level-3',
 	entities: [
 		{
 			type: 'station',

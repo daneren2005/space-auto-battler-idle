@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 const PORT = 4173;
 // The production build is served under this base path (see vite.config.ts).
-const baseURL = `http://127.0.0.1:${PORT}/space-auto-battler-idle/`;
+const baseURL = `http://127.0.0.1:${PORT}/`;
 
 // https://playwright.dev/docs/test-configuration
 export default defineConfig({

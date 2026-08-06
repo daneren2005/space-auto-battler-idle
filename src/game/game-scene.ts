@@ -10,10 +10,11 @@ import {
 } from '@daneren2005/shared-memory-physics';
 import prettyMemory from '@/data/pretty-memory';
 import type { LevelConfig } from '@/data/levels';
-import { getLevelIndex } from '@/data/levels';
+import { getLevelIndex, levels, firstLevel } from '@/data/levels';
 import type { Carry } from '@/data/progress';
-import { saveProgress, resetProgress } from '@/data/progress';
+import { saveProgress, resetProgress, progressAfterMatch, emptyCarry } from '@/data/progress';
 import type { Components } from './components';
+import { carryFromStation } from './player-carry';
 import {
 	hangarRateIndex,
 	hangarLevelIndex,
@@ -97,6 +98,16 @@ export interface GameStats {
 // Whether the match is still being played, or has been won / lost by the player.
 export type GameState = 'playing' | 'won' | 'lost';
 
+// Whether a level-change banner reads as a win (green) or a setback (red); the UIScene's toast tints itself off it.
+export type NoticeTone = 'good' | 'bad';
+
+// The one-line banner handed to the UIScene when the game jumps levels on its own - what happened, and how it
+// should read.  Delivered in-memory (see takeNotice) now that levels change in place rather than by page reload.
+export interface LevelNotice {
+	message: string
+	tone: NoticeTone
+}
+
 export interface GameSceneOptions {
 	world: GameWorld
 	level: LevelConfig
@@ -161,6 +172,24 @@ export default class GameScene extends Phaser.Scene {
 	private roster?: ShipRoster;
 	private state: GameState = 'playing';
 
+	// True only while loadLevel is swapping the world's contents.  addSprite bails out during that window so it can
+	// re-add every sprite in one pass once the whole level is in - a ship takes its colour from its owning station,
+	// which the batch load may create after it (see loadLevel / addSprite).
+	private loadingLevel = false;
+
+	// A level-change banner waiting to be picked up by the UIScene's toast (see takeNotice).  Set as the game jumps
+	// levels on its own; cleared the frame the UI shows it.
+	private pendingNotice: LevelNotice | null = null;
+
+	// A decided match's level swap, deferred to the start of the next update (see queueTransition).  Null except in
+	// the one-frame gap between a match being settled and the world being reloaded into the new level.
+	private pendingTransition: (() => void) | null = null;
+
+	// The last carry read off the player station, captured the moment it is removed.  A loss destroys the station
+	// before the match is settled, so by then it can no longer be read for its money / upgrades - this holds what the
+	// player died with so a defeat carries that rather than zeros (see the entity-removed handler in create()).
+	private lastCarry: Carry = emptyCarry();
+
 	private stationShips: Array<StationShipStat> = [];
 
 	constructor(options: GameSceneOptions) {
@@ -188,20 +217,9 @@ export default class GameScene extends Phaser.Scene {
 	}
 
 	create() {
-		this.world.load({ entities: this.level.entities, bounds: this.level.bounds });
-
-		// The canvas is a fixed size (DISPLAY_*), and the battle only gets the strip between the HUD's top text
-		// and its bottom buttons - so point the game camera at exactly that strip and zoom so this level's world
-		// bounds fill it, centred on the world.  A small level zooms in, a large one zooms out - either way the
-		// UIScene, which has its own full-canvas camera, is untouched, so the HUD/menus never change size with
-		// the level, and no station can be drawn underneath them.
-		const { width, height } = this.scale;
-		const viewport = playAreaViewport(width, height);
-		const bounds = this.level.bounds;
-		const zoom = Math.min(viewport.width / bounds.width, viewport.height / bounds.height);
-		this.cameras.main.setViewport(viewport.x, viewport.y, viewport.width, viewport.height);
-		this.cameras.main.setZoom(zoom);
-		this.cameras.main.centerOn(bounds.width / 2, bounds.height / 2);
+		// The listeners below live for the scene's lifetime and drive every level equally, so they are wired once
+		// here.  The per-level work - loading the world, sizing the camera, applying the carry - is loadLevel, which
+		// runs now for the first level and again in place each time the game jumps to another (no page reload).
 
 		// PerformanceTiming closes a reporting window roughly once a second; ride it for the panel so the whole
 		// snapshot is from the same moment.  There is no sprite catch-up hanging off it any more: syncSprites
@@ -209,21 +227,28 @@ export default class GameScene extends Phaser.Scene {
 		this.timing.on('stats-updated', () => this.refreshStats());
 		this.events.once('shutdown', () => this.timing.destroy());
 
-		// Take a sprite out of play as soon as its entity is removed (killEntityWorker -> world removes it), and
-		// keep it for the next ship to be launched rather than destroying it - see releaseSprite.
-		this.world.on('entity-removed', (entity: { eid: number }) => {
+		// Take a sprite out of play as soon as its entity is removed (killEntityWorker -> world removes it, and a
+		// level change removes every entity at once), and keep it for the next ship rather than destroying it - see
+		// releaseSprite.
+		this.world.on('entity-removed', (entity: GameEntity) => {
 			let sprite = this.eidSpriteMap.get(entity.eid);
 			if(sprite) {
 				this.eidSpriteMap.delete(entity.eid);
 				this.releaseSprite(sprite);
 			}
+
+			// The player station being destroyed is the loss, and its memory is freed just after this event.  The
+			// world removes it from its map before emitting this but frees its component memory only after, so this
+			// is the last point the station can still be read - snapshot the carry here so a defeat carries what the
+			// player died holding rather than the zeros a since-freed station would report.
+			if(entity.eid === this.playerStationEid) {
+				this.lastCarry = carryFromStation(entity);
+			}
 		});
 
-		// Give every entity in the level its sprite up front, and every entity spawned later one as it arrives, so
-		// nothing has to check for a missing sprite on the hot path.  Done after `load` rather than through
-		// `entity-added` for the level's own entities because a ship takes its colour from the station that owns
-		// it, which is only guaranteed to exist once the whole scene is in.
-		this.world.entities.forEach(entity => this.addSprite(entity));
+		// Give every entity spawned during play its sprite as it arrives.  The level's own entities are handled by
+		// loadLevel instead (addSprite bails while loadingLevel is set), because a ship takes its colour from the
+		// station that owns it, which is only guaranteed to exist once the whole scene is in.
 		this.world.on('entity-added', (entity: GameEntity) => this.addSprite(entity));
 
 		// Nothing listens to POSITION_UPDATED_EVENT.  Sprites are synced from `update` every frame instead, because
@@ -232,6 +257,70 @@ export default class GameScene extends Phaser.Scene {
 		// unlistened is not just a no-op either: PhysicsSystem checks per run whether anything is listening and,
 		// when nothing is, the worker stops pushing an id per moved ship into the run's event array and stops
 		// cloning that array back across the boundary.
+
+		this.input.keyboard?.on('keydown-SPACE', () => {
+			if(this.state === 'playing') {
+				this.paused = !this.paused;
+			}
+		});
+
+		this.loadLevel(this.level, this.carry);
+
+		// Draw the HUD on top; it reads this scene back via this.scene.get('game').
+		this.scene.launch('ui');
+
+		// Push an initial snapshot so the panel is populated before the first reporting window elapses.
+		this.refreshStats();
+	}
+
+	// Swaps the whole world over to `level` and applies `carry` on top of its player station, sizing the camera to
+	// the new bounds.  Runs both for the first level (from create) and for every automatic jump afterwards - the
+	// same world, systems and workers are reused across the swap: world.load frees the old entities and loads the
+	// new, and the workers resync from the add/remove deltas that load emits (see BaseWorld.load).  No page reload,
+	// so the running Phaser game, its scenes and the worker threads all survive the level change.
+	private loadLevel(level: LevelConfig, carry: Carry) {
+		this.level = level;
+		this.carry = carry;
+		this.paused = false;
+
+		// Any blasts still animating belong to the level being left; drop them so they don't hang over the new one.
+		this.clearExplosions();
+
+		// Replace the world's contents.  entity-removed fires for every old entity (pooling its sprite), then
+		// entity-added for every new one - addSprite is suppressed for those so it can run in one pass below, once
+		// every station exists and a ship can read its owner's colour.
+		this.loadingLevel = true;
+		this.world.load({ entities: level.entities, bounds: level.bounds });
+		this.loadingLevel = false;
+
+		this.setupCamera();
+		this.world.entities.forEach(entity => this.addSprite(entity));
+		this.setupStationsAndCarry();
+
+		this.state = 'playing';
+	}
+
+	// Points the game camera at the play-area strip and zooms so this level's world bounds fill it.  The canvas is a
+	// fixed size (DISPLAY_*) and the battle only gets the strip between the HUD's top text and its bottom buttons, so
+	// a small level zooms in and a large one zooms out - either way the UIScene, which has its own full-canvas
+	// camera, is untouched, so the HUD/menus never change size with the level and no station is drawn under them.
+	private setupCamera() {
+		const { width, height } = this.scale;
+		const viewport = playAreaViewport(width, height);
+		const bounds = this.level.bounds;
+		const zoom = Math.min(viewport.width / bounds.width, viewport.height / bounds.height);
+		this.cameras.main.setViewport(viewport.x, viewport.y, viewport.width, viewport.height);
+		this.cameras.main.setZoom(zoom);
+		this.cameras.main.centerOn(bounds.width / 2, bounds.height / 2);
+	}
+
+	// Rebuilds the per-station debug tally, finds the player faction, and applies the carried money / upgrades on top
+	// of this level's player-station base, building the roster the UI drives.  Nothing has simulated yet, so plain
+	// writes here are safe (no worker touches the block until the first update next frame).  Each type's carried
+	// bought counts add onto both its rate/level and the matching bought counters, so the type ends up exactly where
+	// the player left it - the level config seeds a base, the carry rebuilds their purchases on top, and a type only
+	// the player unlocked (absent from the config) is rebuilt whole from its bought counts (see progress.ts).
+	private setupStationsAndCarry() {
 		let stations = entityList(this.world).filter(entity => entity.components.controller);
 		this.stationShips = stations.map(station => {
 			let color = station.components.controller!.color;
@@ -251,12 +340,6 @@ export default class GameScene extends Phaser.Scene {
 		// The player faction is the (single) controller flagged `player` in the level.
 		this.playerStationEid = stations.find(station => station.components.controller!.player)?.eid ?? -1;
 
-		// Apply carried-over progress on top of this level's bases for the player, and build the roster the UI drives.
-		// Nothing has simulated yet, so plain writes here are safe (no worker is touching the block until the first
-		// update next frame).  Each type's carried bought counts add onto both its rate/level and the matching bought
-		// counters, so the type ends up exactly where the player left it - the level config seeds a base, the carry
-		// rebuilds their purchases on top, and a type only the player unlocked (absent from the config) is rebuilt
-		// whole from its bought counts (see progress.ts / hangar.ts).
 		const playerController = this.playerController;
 		const playerHangar = this.playerHangar;
 		const playerStation = this.world.getEntityByEid(this.playerStationEid);
@@ -276,22 +359,22 @@ export default class GameScene extends Phaser.Scene {
 			playerController.money += this.carry.money;
 
 			this.roster = new ShipRoster(this.world, playerStation);
+		} else {
+			this.roster = undefined;
 		}
-
-		this.input.keyboard?.on('keydown-SPACE', () => {
-			if(this.state === 'playing') {
-				this.paused = !this.paused;
-			}
-		});
-
-		// Draw the HUD / dialogs on top; it reads this scene back via this.scene.get('game').
-		this.scene.launch('ui');
-
-		// Push an initial snapshot so the panel is populated before the first reporting window elapses.
-		this.refreshStats();
 	}
 
 	update(time: number, delta: number) {
+		// A decided match defers its level swap to here (see queueTransition), so any worker run still in flight from
+		// the deciding frame has settled on the old world first.  loadLevel puts the state back to 'playing', so the
+		// new level simulates from the next frame on.
+		if(this.pendingTransition) {
+			const run = this.pendingTransition;
+			this.pendingTransition = null;
+			run();
+			return;
+		}
+
 		if(this.paused || this.state !== 'playing') {
 			return;
 		}
@@ -319,6 +402,12 @@ export default class GameScene extends Phaser.Scene {
 	// moves arrive on the physics system for the whole run at once (see syncMovedSprites), so a sprite costs no
 	// listener of its own.
 	private addSprite(entity: GameEntity) {
+		// While a level is loading, the whole batch is drawn in one pass afterwards (see loadLevel) so a ship can read
+		// its owning station's colour - the entity-added events firing mid-load are ignored here.
+		if(this.loadingLevel) {
+			return;
+		}
+
 		const transform = entity.components.transform;
 		if(!transform || this.eidSpriteMap.has(entity.eid)) {
 			return;
@@ -445,6 +534,16 @@ export default class GameScene extends Phaser.Scene {
 		}
 	}
 
+	// Retires every live blast at once, hiding each sprite and returning it to the pool.  Called when a level is
+	// swapped out so blasts from the finished battle don't linger over the next one.
+	private clearExplosions() {
+		for(const explosion of this.explosions) {
+			explosion.sprite.visible = false;
+			this.explosionPool.push(explosion.sprite);
+		}
+		this.explosions.length = 0;
+	}
+
 	// Puts one entity's sprite where its entity is.  Everything it draws with - position, facing, whether the
 	// shield is up - is read straight out of the shared-memory blocks resolved when the sprite was dressed,
 	// which already hold whatever the workers wrote, so nothing has to be handed to it and nothing is looked up
@@ -551,59 +650,78 @@ export default class GameScene extends Phaser.Scene {
 		return this.roster;
 	}
 
-	// --- Win/lose dialog + level progression ------------------------------------------------------------
+	// --- Automatic level progression --------------------------------------------------------------------
 
-	get hasNextLevel(): boolean {
-		return !!this.level.nextLevel && getLevelIndex(this.level.nextLevel) >= 0;
+	// The banner the UIScene shows once it has room to; taken (and cleared) by the UI the frame it renders it.
+	takeNotice(): LevelNotice | null {
+		const notice = this.pendingNotice;
+		this.pendingNotice = null;
+		return notice;
 	}
 
-	get dialogButtonLabel(): string {
-		if(this.state === 'won') {
-			return this.hasNextLevel ? 'Next Level' : 'Play Again';
-		}
-		return 'Retry';
-	}
-
-	// Fired by the dialog button.  A win advances to (and persists) the next level carrying the player's upgrades
-	// forward - or, after the last level, wipes progress for a fresh run.  A loss leaves the saved progress alone
-	// so the reload simply retries this level with the same carry it started with.  A reload is the cleanest
-	// reliable reset of the world + workers - and for a level outside the campaign (persistProgress off) it is
-	// the whole action: replay it without touching the saved run.
-	dialogAction(): void {
+	// Works out where the decided match sends the player and jumps there - no win/lose dialog.  A win climbs to (and
+	// persists) the next level carrying the player's upgrades forward, or wipes the run for a fresh start once the
+	// last level is cleared; a loss drops back a level so an idle run keeps banking money on a level it can still
+	// clear (see progressAfterMatch).  Both outcomes carry the money / upgrades the player *finished the match with*
+	// - a loss via the snapshot taken as the station died - so each jump resumes stronger.  The jump happens in
+	// place on the next frame: the world is reloaded (not the page) and the running game and its workers survive.  A
+	// level outside the campaign (persistProgress off) just replays from a clean carry, touching neither the saved
+	// run nor a notice.
+	private advanceAfterMatch(outcome: 'won' | 'lost'): void {
 		if(!this.persistProgress) {
-			window.location.reload();
+			const level = this.level;
+			this.queueTransition(() => this.loadLevel(level, emptyCarry()));
 			return;
 		}
 
-		if(this.state === 'won' && this.level.nextLevel) {
-			const nextIndex = getLevelIndex(this.level.nextLevel);
-			if(nextIndex >= 0) {
-				saveProgress({ levelIndex: nextIndex, carry: this.currentCarry() });
-			}
-		} else if(this.state === 'won') {
+		const levelIndex = getLevelIndex(this.level.name);
+		const nextLevelIndex = this.level.nextLevel ? getLevelIndex(this.level.nextLevel) : -1;
+		const next = progressAfterMatch(outcome, levelIndex, nextLevelIndex, this.currentCarry());
+		if(next === 'reset') {
 			resetProgress();
+			this.queueTransition(() => {
+				this.pendingNotice = { message: 'You cleared every level! Starting a fresh run.', tone: 'good' };
+				this.loadLevel(firstLevel, emptyCarry());
+			});
+		} else {
+			saveProgress(next);
+			const nextLevel = levels[next.levelIndex];
+			const notice = this.matchNotice(outcome, levelIndex, next.levelIndex);
+			this.queueTransition(() => {
+				this.pendingNotice = notice;
+				this.loadLevel(nextLevel, next.carry);
+			});
 		}
-		window.location.reload();
 	}
 
-	// The player's progress to carry into the next level: their money and, per type, how many rate / level upgrades
-	// they have bought (the hangar's bought counters, which reconstruct the whole line when re-applied - see
-	// create()).  Only types with something bought are stored, so the carry stays small and a locked type is simply
-	// absent.
-	private currentCarry(): Carry {
-		const hangar = this.playerHangar;
-		const carry: Carry = { money: this.playerController?.money ?? 0, ships: {} };
-		if(hangar) {
-			for(const type of SHIP_TYPES) {
-				const idx = SHIP_TYPE_INDEX[type];
-				const rate = hangar.rateBought(idx);
-				const level = hangar.levelBought(idx);
-				if(rate > 0 || level > 0) {
-					carry.ships[type] = { rate, level };
-				}
-			}
+	// The one-line banner the destination level shows, describing the jump that just happened.  Levels are numbered
+	// 1-based to match the HUD's "Level N" heading.
+	private matchNotice(outcome: 'won' | 'lost', fromIndex: number, toIndex: number): LevelNotice {
+		if(outcome === 'won') {
+			return { message: `Victory! Advancing to level ${toIndex + 1}.`, tone: 'good' };
 		}
-		return carry;
+		if(toIndex < fromIndex) {
+			return { message: `Your station was destroyed - falling back to level ${toIndex + 1}.`, tone: 'bad' };
+		}
+		// Already at the first level: there is nowhere further back to fall, so it just replays.
+		return { message: 'Your station was destroyed - regrouping on level 1.', tone: 'bad' };
+	}
+
+	// Defer the level swap to the start of the next update rather than running it now.  A worker run dispatched on
+	// the frame the match was decided is still in flight; letting it land first means its ships (and deaths) settle
+	// on the old world and are cleared by the reload, instead of leaking into the new level.  One frame is
+	// imperceptible - there is no deliberate pause.
+	private queueTransition(run: () => void): void {
+		this.pendingTransition = run;
+	}
+
+	// The player's progress to carry forward: their money and, per type, how many rate / level upgrades they have
+	// bought (see carryFromStation).  Read live off the player station when it is still alive (a win), and fall
+	// back to the snapshot taken the moment it was destroyed (a loss) - so either outcome carries exactly what the
+	// player finished the match holding.
+	private currentCarry(): Carry {
+		const station = this.world.getEntityByEid(this.playerStationEid);
+		return station ? carryFromStation(station) : this.lastCarry;
 	}
 
 	private get playerController() {
@@ -633,10 +751,18 @@ export default class GameScene extends Phaser.Scene {
 		});
 
 		if(!playerAlive) {
-			this.state = 'lost';
+			this.endMatch('lost');
 		} else if(!enemiesAlive) {
-			this.state = 'won';
+			this.endMatch('won');
 		}
+	}
+
+	// Called the single frame a match is decided (checkForGameOver only runs while playing, and update() early-
+	// returns once state leaves 'playing', so this fires exactly once).  Flipping the state freezes the simulation
+	// on the deciding frame; advanceAfterMatch then persists the jump and schedules the swap into the new level.
+	private endMatch(outcome: 'won' | 'lost'): void {
+		this.state = outcome;
+		this.advanceAfterMatch(outcome);
 	}
 
 	private getTint(eid: number): number {

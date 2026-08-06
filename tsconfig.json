@@ -37,6 +37,7 @@
 	},
 	"include": [
 		"src/**/*.ts",
+		"scripts/**/*.ts",
 		"e2e/**/*.ts",
 		"*.config.ts"
 	],

@@ -1,14 +1,9 @@
 import type { ComponentDefinition } from '@daneren2005/shared-memory-ecs';
 
-// projectile: marks a fired shot and carries what the projectile systems need to fly and expire it.  A ship
-// fires these from its weapon (see weapon-update); they are sensor bodies (they pass through everything
-// physically) that deal their combat `contactDamage` to the first enemy they overlap and are then consumed
-// (see physics-update).
-//
-// `remainingLifetime` (seconds) is counted down by update-projectiles, which kills the shot when it reaches
-// zero so nothing flies forever.  `target` + `turn` are how a homing shot steers: `target` is the enemy eid it
-// was launched at and `turn` its steer force; a straight shot leaves both at 0 and simply coasts on its launch
-// velocity.  The presence of this block is also what tells the collision code an entity is a projectile.
+// projectile: marks a fired shot. These are sensor bodies that deal their combat `contactDamage` to the first
+// enemy they overlap, then are consumed. `remainingLifetime` (seconds) is counted down by update-projectiles.
+// `target` + `turn` steer a homing shot; a straight shot leaves both at 0. This block's presence is what tells
+// the collision code an entity is a projectile.
 
 // Block layout (Float32Array, size 3).
 export const PROJECTILE_REMAINING_LIFETIME = 0;

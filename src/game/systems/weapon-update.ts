@@ -18,12 +18,8 @@ type Scratch = ComponentSystemWorld & {
 	positionByEid?: Record<number, TargetPosition>
 };
 
-// Each armed ship fires its weapon at the target the targeting system has already picked for it, whenever that
-// target is inside the weapon's range and its cooldown has elapsed.  A volley is `projectileCount` shots fanned
-// evenly across `spread` radians, launched from the ship toward the target; homing shots additionally carry the
-// target eid + a steer force so update-projectiles can chase it, while straight shots simply coast on the launch
-// velocity.  Creation can't happen in a worker (eid allocation lives on the main thread), so createEntityWorker
-// buffers each shot's flat config and the projectiles first exist next frame - exactly as the spawn system does.
+// Each armed ship fires at its already-picked target when it's in range and the cooldown has elapsed.
+// Creation can't happen in a worker, so createEntityWorker buffers each shot for next frame (like spawn-ship).
 export const weaponUpdate: EntityUpdateFunction<Components, Pick<ComponentArrays, 'weapon' | 'attack' | 'transform' | 'body' | 'controlled'>> = (world, entityId, components, queries, callbacks) => {
 	const scratch = world as Scratch;
 	const weapon = components.weapon;
@@ -33,7 +29,7 @@ export const weaponUpdate: EntityUpdateFunction<Components, Pick<ComponentArrays
 		return;
 	}
 
-	// The cooldown clock always advances (world runs in ms; the interval is in seconds).
+	// Cooldown clock always advances (world runs in ms; the interval is in seconds).
 	weapon[WEAPON_TIME_SINCE_FIRED] += world.elapsedTime / 1_000;
 
 	const target = attack[ATTACK_TARGET];
@@ -60,10 +56,8 @@ export const weaponUpdate: EntityUpdateFunction<Components, Pick<ComponentArrays
 	fireVolley(x, y, dx, dy, weapon, components.body, components.controlled[CONTROLLED_OWNER], target, callbacks);
 };
 
-// Launches one volley: `count` shots fanned across `spread`, each aimed from (x, y) along the direction to the
-// target.  A shot inherits the firing ship's collide category + mask (so it hits the same enemies the ship does)
-// and its owner (so a kill it lands pays the ship's faction).  A Carrier's weapon launches drone sub-ships in the
-// same fan instead of projectiles - full ships that fly out on the launch heading and then hunt on their own.
+// Launches one volley: `count` shots fanned across `spread`, aimed from (x, y) at the target. Shots inherit the
+// ship's collide category/mask and owner. A Carrier launches drone sub-ships in the same fan instead.
 function fireVolley(
 	x: number,
 	y: number,
@@ -83,22 +77,20 @@ function fireVolley(
 	const homing = weapon[WEAPON_HOMING] !== 0;
 	const turn = homing ? weapon[WEAPON_HOMING_TURN] : 0;
 	const spawnsDrones = weapon[WEAPON_SPAWNS_DRONES] !== 0;
-	// Live long enough to cross the weapon's whole range, plus a little slack so a shot fired at the edge can
-	// still reach a target that has drifted a touch further out.
+	// Crosses the weapon's range, plus slack for a target that drifts further out.
 	const lifetime = weapon[WEAPON_RANGE] / speed + 0.25;
 	const collideCategory = body[BODY_CATEGORY_INDEX];
 	const collideMask = body[BODY_MASK_INDEX];
 
 	for(let i = 0; i < count; i++) {
-		// Fan the volley symmetrically about the aim line: one shot fires dead on, more spread evenly across it.
+		// Fan symmetrically about the aim line: one shot dead on, more spread evenly across it.
 		const offset = count > 1 ? (i / (count - 1) - 0.5) * spread : 0;
 		const angle = baseAngle + offset;
 		const velocityX = Math.cos(angle) * speed;
 		const velocityY = Math.sin(angle) * speed;
 
 		if(spawnsDrones) {
-			// A drone is a full ship, not a shot: it launches on the fan heading and then targets and rams like a
-			// Wasp, carrying its own fixed stats rather than the weapon's per-shot damage or lifetime.
+			// A drone is a full ship: it launches on the fan heading, then targets and rams with its own stats.
 			createEntityWorker({
 				type: 'drone',
 				x, y,
@@ -127,8 +119,7 @@ function fireVolley(
 	}
 }
 
-// Gather every possible target's position once per run, so a firing ship can look up whoever it is aiming at -
-// the same approach move-to-target uses to steer.
+// Gather every target's position once per run, so a firing ship can look up its aim point (like move-to-target).
 weaponUpdate.preRun = (world, entities, queries) => {
 	const scratch = world as Scratch;
 	const positionByEid: Record<number, TargetPosition> = {};

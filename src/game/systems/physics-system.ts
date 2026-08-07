@@ -6,26 +6,21 @@ import { readBounds } from './game-component-system';
 import { physicsUpdate, type GamePhysicsComponents } from './physics-update';
 import PhysicsWorker from './physics.worker?worker';
 
-// The library's PhysicsSystem, with this game's `bounds` added to the per-run data object the same way
-// GameComponentSystem does it - physicsUpdate needs them to bounce ships off the edge of the map.
+// The library's PhysicsSystem with this game's `bounds` added, which physicsUpdate needs to bounce ships off walls.
 export class GamePhysicsSystem extends PhysicsSystem<Components, GamePhysicsComponents, CustomSystemWorld> {
 	addDataToWorld(world: CustomSystemWorld): void {
-		// The library's own version stamps the run with its step number, which every interpolation block is
-		// published under - so this is an addition to what it does, not a replacement for it.
+		// super stamps the run's step number (interpolation blocks publish under it), so this adds, not replaces.
 		super.addDataToWorld(world);
 
 		world.bounds = readBounds(this.world);
 	}
 }
 
-// Move every ship, keep it on the map, and resolve the collisions, damage, deaths and bounties that come out of
-// where it ends up.  This one system replaces the separate velocity + collision systems this game used to run:
-// collisions are found as each ship moves, against the position it actually moved to.
+// Moves every ship, keeps it on the map, and resolves collisions/damage/deaths/bounties against where it lands.
 export function createPhysicsSystem(world: BaseWorld<typeof registry>): GamePhysicsSystem {
 	return new GamePhysicsSystem(world, {
 		name: 'physicsSystem',
-		// The same update the worker file hands to createComponentWorker, so both backends behave identically.  It
-		// carries the components + collidable query it needs, so neither has to be repeated here.
+		// The same update the worker hands to createComponentWorker, so both backends behave identically.
 		updateFunction: physicsUpdate,
 		getWorker: () => new PhysicsWorker(),
 	});

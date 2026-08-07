@@ -4,10 +4,8 @@ import { PLAYER_COLOR, ENEMY_COLOR } from '@/data/colors';
 import { factionCollision } from '@/data/collide-categories';
 import { PLAYER_START_SHIPS } from './player-start';
 
-// Act II (see level-5.ts): the enemy fields its first shielded tank - a single low-level Bulwark - in front of the
-// Skiff-and-Gunner line.  A Bulwark soaks hits and lumbers forward, so a fleet that only rams stalls against it;
-// this is the level that teaches the player to invest in a type that out-damages armour (a Railgun's single heavy
-// slug, or enough Gunner fire to grind the shields down) rather than throwing more one-shield Skiffs at a wall.
+// Act II: the enemy's first shielded tank (a low-level Bulwark) fronts the Skiff-and-Gunner line, teaching the
+// player to invest in a type that out-damages armour rather than ramming.
 const WIDTH = 400;
 const HEIGHT = 700;
 const MARGIN = 90;

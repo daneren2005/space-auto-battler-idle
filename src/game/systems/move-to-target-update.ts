@@ -16,21 +16,13 @@ type Scratch = ComponentSystemWorld & {
 	positionByEid?: Record<number, TargetPosition>
 };
 
-// How hard a strafing ship leans back toward its standoff radius while sliding sideways, as a fraction of its
-// sideways motion.  Small, so it reads as a weave across the target's front that holds its range rather than a
-// spiral in or a drift out.
+// How hard a strafing ship leans back toward its standoff radius while sliding sideways. Small, so it weaves
+// across the target's front rather than spiralling in or drifting out.
 const STRAFE_RADIAL_PULL = 0.35;
 
-// Steers each ship toward its assigned target by nudging its velocity toward the target and renormalising to
-// the ship's top speed, then re-faces it along the new heading.  Target positions are gathered once per run
-// via the `targets` query (everything with a transform) so a ship can look up whoever it is chasing.
-//
-// An armed ship stops charging once its target is inside its standoff range (its weapon range) so it can hold
-// and shoot instead of ramming: a plain gunship freezes and faces the target, a strafer slides side-to-side
-// across it (see below).  Because a ship always targets its nearest enemy, holding while that nearest enemy is
-// in range is exactly "stop when close enough to fire, and only close in again once every near target is dead" -
-// the moment the last in-range enemy falls, the next-nearest is out of range and the ship advances on it.  A
-// rammer (standoff 0 - the Skiff, Detonator, drones) never holds and keeps closing to make contact.
+// Steers each ship toward its target, renormalising to its top speed, then re-faces it. Target positions are
+// gathered once per run via the `targets` query. An armed ship holds once its target is inside standoff range
+// so it fights at range instead of ramming; a rammer (standoff 0) keeps closing.
 export const moveToTargetUpdate: EntityUpdateFunction<Components, Pick<ComponentArrays, 'velocity' | 'transform' | 'attack'>> = (world, entityId, components) => {
 	const scratch = world as Scratch;
 	const velocity = components.velocity;
@@ -56,12 +48,12 @@ export const moveToTargetUpdate: EntityUpdateFunction<Components, Pick<Component
 	const speed = attack[ATTACK_SPEED];
 	const standoff = attack[ATTACK_STANDOFF_RANGE];
 
-	// In firing range: hold rather than keep closing, so an armed ship fights at range instead of ramming.
+	// In firing range: hold rather than keep closing.
 	if(standoff > 0 && distance <= standoff) {
 		if(attack[ATTACK_STRAFE] === 1) {
 			strafe(world, velocity, transform, attack, force, distance, standoff, speed);
 		} else {
-			// Freeze in place and face the target so the ship's guns stay trained on it.
+			// Freeze and face the target so the guns stay trained on it.
 			velocity[VELOCITY_X_INDEX] = 0;
 			velocity[VELOCITY_Y_INDEX] = 0;
 			transform[TRANSFORM_ANGLE_INDEX] = computeAngle(dx, dy);
@@ -79,9 +71,8 @@ export const moveToTargetUpdate: EntityUpdateFunction<Components, Pick<Component
 	transform[TRANSFORM_ANGLE_INDEX] = computeAngle(newVelocityX, newVelocityY);
 };
 
-// Slides a strafing ship perpendicular to its target, reversing each leg, while easing back toward its standoff
-// radius so it holds range as it weaves.  It faces the way it is moving - which puts the target off its beam - so
-// its shots leave out the side (the Missile Frigate raining homing missiles across the enemy's front).
+// Slides perpendicular to the target, reversing each leg, easing back toward the standoff radius as it weaves.
+// Faces the way it moves, so its shots leave out the side (the Missile Frigate).
 function strafe(
 	world: ComponentSystemWorld,
 	velocity: Float32Array,
@@ -92,7 +83,7 @@ function strafe(
 	standoff: number,
 	speed: number,
 ) {
-	// Advance this leg's clock; flip to the other side once it has slid long enough.
+	// Advance this leg's clock; flip sides once it has slid long enough.
 	const elapsed = world.elapsedTime / 1_000;
 	let direction = attack[ATTACK_STRAFE_TIMER] >= 0 ? 1 : -1;
 	let leg = Math.abs(attack[ATTACK_STRAFE_TIMER]) + elapsed;
@@ -102,8 +93,7 @@ function strafe(
 	}
 	attack[ATTACK_STRAFE_TIMER] = direction * leg;
 
-	// Perpendicular to the aim line (the side chosen by the current leg), plus a gentle pull along it back to the
-	// standoff radius: positive to move in when too far, negative to ease out when too close.
+	// Perpendicular to the aim line, plus a gentle radial pull back to the standoff radius.
 	const perpX = -force.y * direction;
 	const perpY = force.x * direction;
 	const radial = Math.max(-1, Math.min(1, (distance - standoff) / standoff)) * STRAFE_RADIAL_PULL;

@@ -1,29 +1,16 @@
 import type { ComponentDefinition } from '@daneren2005/shared-memory-ecs';
 
-// attack: the eid a ship is currently steering toward (0 = none) plus how it flies while chasing it - how
-// strongly it steers toward that target each tick, and the top speed it renormalises to afterwards.  `attacks`
-// is a marker Config prop that a type template sets to opt an entity into targeting; steerForce and speed are
-// Config; target is the only runtime state and it is not worth persisting.
+// attack: the eid a ship steers toward (0 = none) plus how it flies while chasing - steer force and top speed.
+// `speed` lives here, not on the physics velocity component, since the top speed a ship steers back to is this
+// game's own idea and moveToTargetUpdate (its only reader) already requires this component.
 //
-// `speed` lives here rather than on the velocity component because that component comes from
-// shared-memory-physics and holds only the live vector: the top speed a ship steers back to is this game's own
-// idea, and moveToTargetUpdate - the only thing that reads it - already requires this component.
-//
-// steerForce is rolled once per ship, somewhere between the template's steerForce and steerForceBonus above
-// it, rather than being copied straight off the template - so no two ships turn at quite the same radius.
-// That roll is why it is stored per-entity.
-//
-// The roll only ever goes UP.  Speed is constant, so steerForce is what sets a ship's turn radius, and a ship
-// can never reach anything inside its own turn circle: rolling a ship's steer force *down* widens that circle
-// and makes it worse at closing, which measurably causes more of the circling this is meant to reduce, not
-// less.  A one-sided roll keeps every ship distinct without ever making one worse than the template.
+// steerForce is rolled once per ship so no two turn at the same radius. The roll only ever goes UP: a lower
+// steer force widens the turn circle and makes a ship worse at closing, causing more circling, not less.
 
-// How far past its own hull a ship looks for an enemy when its type does not ask for more.  A long-range type
-// (Railgun, Missile Frigate) sets a bigger `searchRange` so it can acquire targets as far out as it can shoot.
+// How far past its hull a ship looks for an enemy by default. Long-range types set a bigger `searchRange`.
 export const DEFAULT_SEARCH_RANGE = 150;
 
-// How long a strafing ship slides one way before reversing, in seconds - so it weaves back and forth across its
-// target's front rather than committing to one direction (the Missile Frigate).  Read by move-to-target.
+// Seconds a strafing ship slides one way before reversing (the Missile Frigate). Read by move-to-target.
 export const STRAFE_LEG_SECONDS = 1.4;
 
 // Block layout (Float32Array, size 7).
@@ -31,13 +18,10 @@ export const ATTACK_TARGET = 0;
 export const ATTACK_STEER_FORCE = 1;
 export const ATTACK_SPEED = 2;
 export const ATTACK_SEARCH_RANGE = 3;
-// The distance at which an armed ship stops charging and holds so it can fire (its weapon range); 0 for a rammer,
-// which keeps closing to make contact.  See move-to-target.
+// The range an armed ship holds at to fire (its weapon range); 0 for a rammer, which keeps closing.
 export const ATTACK_STANDOFF_RANGE = 4;
-// Whether, once inside standoff range, the ship strafes side-to-side instead of holding still (config, 0/1).
 export const ATTACK_STRAFE = 5;
-// Runtime strafe state: sign is the lateral direction it is currently sliding, magnitude is how many seconds it
-// has been on this leg.  Only touched by move-to-target, on the one thread that steers, so a plain read is fine.
+// Runtime strafe state: sign is the current lateral direction, magnitude is seconds on this leg.
 export const ATTACK_STRAFE_TIMER = 6;
 
 export interface AttackComponent {
@@ -56,9 +40,9 @@ export interface AttackConfig {
 	steerForceBonus?: number
 	speed: number
 	searchRange?: number
-	// The range an armed ship holds at once it can fire; omitted (0) for a rammer, which closes all the way.
+	// The range an armed ship holds at; omitted (0) for a rammer, which closes all the way.
 	standoffRange?: number
-	// Whether the ship strafes across its target instead of holding still once in range (the Missile Frigate).
+	// Strafe across the target instead of holding still once in range (the Missile Frigate).
 	strafe?: boolean
 }
 export const attackDefinition: ComponentDefinition<AttackComponent, Float32Array, AttackConfig> = {
@@ -74,8 +58,7 @@ export const attackDefinition: ComponentDefinition<AttackComponent, Float32Array
 			config.searchRange ?? DEFAULT_SEARCH_RANGE,
 			config.standoffRange ?? 0,
 			strafe,
-			// Seed each strafer a random side and leg offset so a batch of them weaves out of phase rather than
-			// sliding in lockstep; a non-strafer never reads this.
+			// Seed a random side + leg offset so a batch of strafers weaves out of phase, not in lockstep.
 			strafe ? (Math.random() < 0.5 ? -1 : 1) * Math.random() * STRAFE_LEG_SECONDS : 0,
 		]);
 		const block = memory.getBlock(index);
@@ -128,9 +111,7 @@ export const attackDefinition: ComponentDefinition<AttackComponent, Float32Array
 	},
 };
 
-// A steer force somewhere in [steerForce, steerForce * (1 + bonus)] - so `bonus` of 0.5 turns a template
-// steerForce of 10 into a roll over 10 to 15.  Defaults to none, so a ship type that wants every unit
-// identical simply omits it.
+// A roll in [steerForce, steerForce * (1 + bonus)]. Omitting `bonus` makes every unit identical.
 function rollSteerForce(steerForce: number, bonus: number | undefined): number {
 	if(!bonus) {
 		return steerForce;

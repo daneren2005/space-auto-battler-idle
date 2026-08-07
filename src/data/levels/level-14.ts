@@ -4,15 +4,11 @@ import { PLAYER_COLOR, ENEMY_COLOR } from '@/data/colors';
 import { factionCollision } from '@/data/collide-categories';
 import { PLAYER_START_SHIPS } from './player-start';
 
-// Act III finale (see level-10.ts): a THIRD enemy station opens across the top - armour on the left, a sniper nest
-// in the centre, a mixed battery on the right - so pressure now comes down three lanes at once and the player can
-// hold none of them passively.  All three bases are the one allied red faction, ganging up rather than fighting
-// each other.  It is the bridge into Act IV: the onslaught's multi-front shape, at levels a fully built fleet can
-// still just beat, before Act IV pushes past what an un-prestiged run can.
+// Act III finale: a third enemy station opens across the top (armour left, sniper centre, mixed battery right,
+// all one allied faction), so pressure comes down three lanes at once. The bridge into Act IV.
 const WIDTH = 580;
 const HEIGHT = 960;
 const MARGIN = 120;
-// Three bases spread across the top edge, so their lanes cover the left, centre and right of the field.
 const LEFT_X = Math.round(WIDTH * 0.2);
 const CENTER_X = Math.round(WIDTH * 0.5);
 const RIGHT_X = Math.round(WIDTH * 0.8);

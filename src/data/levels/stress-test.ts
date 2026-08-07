@@ -3,39 +3,25 @@ import type { Config } from '@/game/components';
 import { FACTION_PALETTE } from '@/data/colors';
 import { factionCollision } from '@/data/collide-categories';
 
-// A benchmark battle rather than a campaign level: every colour in the palette fields a faction, each pouring
-// out ships far faster than they can die, so the engine is asked to simulate thousands of them colliding at
-// once and the load keeps climbing for as long as the page is left open.  It is deliberately left out
-// of `levels` (data/levels/index.ts) - it has no place in the play order, it never advances anywhere, and the
-// campaign's shape (a portrait field with exactly two stations) does not apply to it.  It is reached by opening
-// the /stress-test page, which boots it on a landscape canvas; see src/stress-test.ts.
-// Sized to the wide canvas's play-area aspect (its landscape strip is more elongated than the level's own two
-// rows), so the camera's fit-to-bounds zoom fills the strip almost edge to edge instead of letterboxing the
-// level with dead space either side.
+// A benchmark battle, not a campaign level: every palette colour fields a faction pouring out ships far faster
+// than they die, so load climbs for as long as the page is open. Left out of `levels`; reached via the
+// /stress-test page on a landscape canvas. Sized to that canvas's play-area aspect so the camera fills it.
 const WIDTH = 1800;
 const HEIGHT = 700;
-// Far enough in from the edges that a station never sits on the boundary its own ships bounce off.  It is also
-// what sets how far apart the two rows are: at this margin they end up the same distance apart as the stations
-// within a row, so every faction is equally close to its neighbours either side and the one opposite, and the
-// fighting fills the middle of the map as well as the rows.
+// Far enough in that a station never sits on the wall its own ships bounce off; also sets the row spacing so
+// every faction is equally close to its neighbours and opposite.
 const MARGIN = 200;
-// How fast each faction launches ships.  Nothing caps the fleet any more, so this is the whole dial: the ship
-// count climbs at FACTIONS x this per second minus however many are dying, until the frame rate gives out.
+// The whole dial: nothing caps the fleet, so the count climbs at FACTIONS x this per second until the frame rate gives out.
 const SHIPS_PER_SECOND_PER_FACTION = 200;
 
-// One faction per palette colour, so a colour added to (or removed from) data/colors.ts changes the size of the
-// stress test with it.  factionCollision caps out at MAX_FACTIONS (32), well above the palette.
+// One faction per palette colour, so editing data/colors.ts resizes the stress test. Caps at MAX_FACTIONS (32).
 const FACTIONS = FACTION_PALETTE.length;
 
-// The stations are laid out as two facing rows - the first half along the bottom edge, the rest along the top -
-// evenly spaced across the full width.  Every faction gets a neighbour either side and one opposite, so the
-// fighting spreads over the whole map instead of collapsing into one melee in the middle.
+// Two facing rows (bottom half, top half) evenly spaced across the width, so the fighting spreads over the map.
 const COLUMNS = Math.ceil(FACTIONS / 2);
 const COLUMN_SPACING = COLUMNS > 1 ? (WIDTH - 2 * MARGIN) / (COLUMNS - 1) : 0;
 
-// Which column each faction takes within its row, ordered from the middle outwards.  That puts faction 0 - the
-// player - in the middle of the bottom row, nearest the upgrade buttons, the way they hold the bottom edge of a
-// campaign level, and fills the rows outwards from there however many factions there turn out to be.
+// Each faction's column, ordered middle-outwards, so faction 0 (the player) sits in the middle of the bottom row.
 const MIDDLE_COLUMN = (COLUMNS - 1) / 2;
 const COLUMN_ORDER = [...Array(COLUMNS).keys()]
 	.sort((left, right) => Math.abs(left - MIDDLE_COLUMN) - Math.abs(right - MIDDLE_COLUMN));
@@ -56,9 +42,7 @@ export const stressTestLevel: LevelConfig = {
 			color,
 			...factionCollision(faction),
 			player: faction === 0,
-			// Every faction pours out the same Skiff line at the punishing rate.  Level 2 gives each Skiff a shield
-			// (one per level over its shieldless base), so ships survive their first hit and the fight stays crowded
-			// instead of thinning out the moment the fleets meet.
+			// Level 2 gives each Skiff a shield, so ships survive their first hit and the fight stays crowded.
 			ships: { skiff: { rate: SHIPS_PER_SECOND_PER_FACTION, level: 2 } },
 		};
 	}),

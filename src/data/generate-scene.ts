@@ -12,9 +12,8 @@ export default function generateScene(options: OptionsConfig) {
 			y,
 			type: 'station',
 			color: factionColor(i),
-			// Each generated station is its own faction, so it collides with everyone else's ships and not its own.
+			// Each generated station is its own faction.
 			...factionCollision(i),
-			// Every generated station builds the same Skiff line at the requested rate.
 			ships: { skiff: { rate: options.shipsPerSecond ?? 1, level: 1 } },
 		});
 	}

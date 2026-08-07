@@ -6,8 +6,7 @@ import { CONTROLLER_COLOR } from '../components/controller';
 import { CONTROLLED_OWNER } from '../components/controlled';
 import { ATTACK_TARGET, ATTACK_SEARCH_RANGE } from '../components/attack';
 
-// A station as the fallback needs it: where it is and whose it is.  Stations are few and every ship that has
-// found nothing nearby looks at all of them, so this is a plain list rather than another index.
+// The fallback scans every station, but stations are few, so a plain list rather than another index.
 interface StationDatum {
 	eid: number
 	x: number
@@ -21,10 +20,8 @@ type Scratch = ComponentSystemWorld & {
 	stations?: Array<StationDatum>
 };
 
-// Assigns each ship a target: the nearest enemy (different colour) within search range, falling back to the
-// nearest enemy station so idle ships always have somewhere to go.  Two library queries feed it: `collidable`
-// (everything with a transform + health, i.e. every ship and station) drives the spatial index, and `stations`
-// drives the fallback.
+// Assigns each ship the nearest enemy (different colour) within search range, falling back to the nearest enemy
+// station. `collidable` drives the spatial index; `stations` drives the fallback.
 export const targetEnemyUpdate: EntityUpdateFunction<Components, Pick<ComponentArrays, 'attack' | 'transform'>> = (world, entityId, components) => {
 	const scratch = world as Scratch;
 	const attack = components.attack;
@@ -37,12 +34,10 @@ export const targetEnemyUpdate: EntityUpdateFunction<Components, Pick<ComponentA
 	const shipColor = colorByEid[entityId];
 	const x = transform[TRANSFORM_X_INDEX];
 	const y = transform[TRANSFORM_Y_INDEX];
-	// The index measures to an enemy's hull rather than to its centre, so the range only has to allow for this
-	// ship's own half - the other side is already accounted for.  Each ship carries its own search range, so a
-	// long-range type can acquire targets as far out as it can shoot.
+	// The index measures to an enemy's hull, so reach only adds this ship's own half.
 	const reach = Math.max(transform[TRANSFORM_WIDTH_INDEX], transform[TRANSFORM_HEIGHT_INDEX]) / 2 + attack[ATTACK_SEARCH_RANGE];
 
-	// One walk of the tree in distance order: it settles on the nearest enemy without measuring anything past it.
+	// One walk of the tree in distance order, settling on the nearest enemy without measuring past it.
 	const nearest = scratch.spatialIndex.findNearest(x, y, reach, other => {
 		return other.entityId !== entityId && colorByEid[other.entityId] !== shipColor;
 	});
@@ -75,7 +70,7 @@ targetEnemyUpdate.preRun = (world, entities, queries) => {
 	const collidable = queries.collidable ?? [];
 	const stationEntities = queries.stations ?? [];
 
-	// Station eid -> its colour, so a ship's colour can be resolved through the station that owns it.
+	// Station eid -> colour, so a ship's colour resolves through the station that owns it.
 	const stationColor: Record<number, number> = {};
 	const stations: Array<StationDatum> = [];
 	for(let station of stationEntities) {
@@ -98,7 +93,7 @@ targetEnemyUpdate.preRun = (world, entities, queries) => {
 	for(let entity of collidable) {
 		const controller = entity.components.controller;
 		const controlled = entity.components.controlled;
-		// -1 is a colour no station uses, so orphaned ships (owner already gone) match nobody.
+		// -1 is a colour no station uses, so orphaned ships match nobody.
 		colorByEid[entity.entityId] = controller ? controller[CONTROLLER_COLOR]
 			: controlled ? stationColor[controlled[CONTROLLED_OWNER]] ?? -1
 				: -1;
@@ -106,7 +101,6 @@ targetEnemyUpdate.preRun = (world, entities, queries) => {
 
 	scratch.colorByEid = colorByEid;
 	scratch.stations = stations;
-	// Everything with a place in the world goes in - the index skips anything the query turned up without a
-	// transform - and which of them are actually enemies is settled by the filter each ship searches with.
+	// Everything goes in; each ship's search filter settles which are enemies.
 	scratch.spatialIndex = new SpatialIndex(collidable);
 };

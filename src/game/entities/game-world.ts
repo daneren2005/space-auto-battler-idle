@@ -19,53 +19,42 @@ export interface Scene {
 	bounds: Bounds
 }
 
-// The game's world.  It supplies the component registry + the per-type templates (a station's / ship's shared
-// static config, from data/entities) to the library's BaseWorld, and wires up the five systems that actually
-// play the game.  All of the heavy lifting - memory allocation, load/save, running systems on / off the main
-// thread - comes from the library; this class only declares what THIS game is made of.
-//
-// `update` is driven in milliseconds, which is what shared-memory-physics measures elapsedTime in (velocity is
-// per second, and the system converts).  Everything else that reads a clock does the same conversion.
+// Supplies the component registry + per-type templates to BaseWorld and wires up the systems. All the heavy
+// lifting (memory, load/save, on/off-thread runs) is the library's; this class only declares what THIS game is.
+// `update` is driven in milliseconds (what shared-memory-physics expects).
 export default class GameWorld extends BaseWorld<typeof registry> {
 	bounds: Bounds = { width: 0, height: 0 };
 
-	// Held by name because the scene listens to it: physics reports each run's movement on the system rather
-	// than on the entities, so the thing drawing them has to be able to reach it.  Like every system here it
-	// lives for the world's lifetime, so this is safe to hand out for as long as the world is.
+	// Held by name because the scene draws off it: physics reports each run's movement on the system, not the
+	// entities. Lives for the world's lifetime, so safe to hand out.
 	physicsSystem: GamePhysicsSystem;
 
 	constructor() {
 		super(registry, {
 			factory: new EntityFactory<Components, Config>(entityConfigs),
 		});
-		// Systems live for the world's lifetime.  They subscribe to entity-added/-removed and BaseWorld#load only
-		// clears each system's entity list (not the systems themselves), so setting them up here is enough - load
-		// re-populates them by re-emitting entity-added for every entity in the scene.
+		// Systems live for the world's lifetime; load only clears their entity lists, then re-populates them by
+		// re-emitting entity-added, so setting them up once here is enough.
 		this.physicsSystem = this.initSystems();
 	}
 
 	load(scene: Scene) {
 		this.bounds = scene.bounds;
 		super.load({ entities: scene.entities });
-		// Kicks off worker initialization; runs work regardless of whether this has resolved yet.
+		// Kicks off worker init; runs work regardless of whether this has resolved yet.
 		void this.init();
 	}
 
 	private initSystems(): GamePhysicsSystem {
 		this.addSystem(createUpdateHealthTimersSystem(this));
 		this.addSystem(createSpawnShipSystem(this));
-		// Physics takes the slot the collision system used to hold, so movement + collisions still run after the
-		// frame's spawns rather than before them: a ship exists for a frame before anything can run into it.
-		//
-		// Interpolation goes in immediately after it, so a step is drawn on the frame it landed on rather than the
-		// one after.  Nothing about the smoothness depends on that - it is paced by what has arrived in each
-		// entity's block - so it is worth one frame of latency and nothing more.
+		// Physics runs after spawns, so a ship exists for a frame before anything can run into it. Interpolation
+		// follows immediately so a step is drawn on the frame it landed on.
 		const physicsSystem = this.addSystem(createPhysicsSystem(this));
 		this.addSystem(createInterpolationSystem(this));
 		this.addSystem(createTargetEnemySystem(this));
-		// Weapons fire after targeting has picked each ship's target and before movement, so a ship shoots at
-		// whoever it is about to steer toward.  Projectile upkeep (lifetime + homing guidance) runs last, once the
-		// shots this frame have been created and everything has its final position.
+		// Weapons fire after targeting and before movement, so a ship shoots at whoever it's about to steer toward.
+		// Projectile upkeep runs last, once this frame's shots exist and everything has its final position.
 		this.addSystem(createWeaponSystem(this));
 		this.addSystem(createMoveToTargetSystem(this));
 		this.addSystem(createUpdateProjectilesSystem(this));

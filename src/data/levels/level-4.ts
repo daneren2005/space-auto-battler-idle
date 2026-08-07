@@ -4,10 +4,8 @@ import { PLAYER_COLOR, ENEMY_COLOR } from '@/data/colors';
 import { factionCollision } from '@/data/collide-categories';
 import { PLAYER_START_SHIPS } from './player-start';
 
-// Act I finale (see level-3.ts for the act): the Skiff line maxes out at five a second, level 4 - three shields
-// each and, on the level curve's slower damage cadence, ramming for two.  A pure-Skiff fleet this dense is the
-// wall the starter line hits: clearing it reliably wants the player to have banked toward the Gunner unlock (a
-// ship that kills at range instead of trading rams), which Act II then leans on.  Field unchanged from Act I.
+// Act I finale: the Skiff line maxes at five a second, level 4 - the wall the starter line hits, which wants
+// the player to have banked toward the Gunner unlock.
 const WIDTH = 360;
 const HEIGHT = 640;
 const MARGIN = 80;

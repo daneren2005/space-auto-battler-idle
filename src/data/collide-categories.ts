@@ -1,17 +1,9 @@
 // Who collides with whom, in the `collideCategory` / `collideMask` bits shared-memory-physics filters on.
-//
-// Collision is per faction rather than per entity type: everything one controller owns - its station and every
-// ship it spawns - collides as that faction's single category bit, and accepts every bit except its own.  So a
-// faction's own ships fly straight through each other and through their home station, and run into anything
-// belonging to anyone else.  Ships inherit their station's category + mask as they spawn (see spawnShipUpdate),
-// so a faction only ever has to be given a number here, on its station.
-//
-// Faction numbering matches factionColor's, so faction 0 - the player in a hand-authored level - collides as
-// category 1, faction 1 as 2, faction 2 as 4, and so on.
+// Collision is per faction: everything a controller owns collides as its single category bit and accepts every
+// bit but its own, so a faction's own ships pass through each other and hit anyone else's. Ships inherit their
+// station's category + mask on spawn. Faction numbering matches factionColor's (faction 0 -> bit 1, etc).
 
-// One bit per faction in a 32 bit field, so this is how many factions can ever be told apart.  Past it two
-// factions would share a bit and stop colliding with each other, which is why it throws rather than wrapping
-// the way factionColor does with its palette.
+// One bit per faction in a 32-bit field. Past it two factions would share a bit and stop colliding, so it throws.
 export const MAX_FACTIONS = 32;
 
 // The category bit a faction collides as.
@@ -23,10 +15,9 @@ export function factionCategory(faction: number): number {
 	return 1 << faction;
 }
 
-// The pair of body config props a faction's station is loaded with: it collides as its own bit and with every
-// bit but its own.  Spread into a station's entity config alongside its colour.
+// The body config props a faction's station loads with. Spread into a station's config alongside its colour.
 export function factionCollision(faction: number): { collideCategory: number, collideMask: number } {
 	const collideCategory = factionCategory(faction);
-	// Stored in a Uint32Array, so keep the complement unsigned rather than handing over a negative number.
+	// Stored in a Uint32Array, so keep the complement unsigned.
 	return { collideCategory, collideMask: ~collideCategory >>> 0 };
 }

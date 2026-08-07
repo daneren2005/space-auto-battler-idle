@@ -6,63 +6,49 @@ import formatStats from './format-stats';
 import { HUD_TOP_HEIGHT, HUD_BOTTOM_HEIGHT } from './display';
 import { SHIP_TYPES, SHIP_TYPE_DEFS, combatStat, nextLevelSummary, type ShipType } from '@/data/ship-types';
 
-// Key for the bitmap font (public/ui/orbitron.png + orbitron.fnt, exported from snowb.org).  All HUD / menu
-// text is drawn with it so the UI has a consistent sci-fi typeface, coloured per-use with FILL-mode tint
-// (setTintFill) so it works regardless of the atlas glyph colour.  NOTE: export it at a modest size (~100px)
-// with a few px of glyph spacing - baking large (200px) + tight packing makes the small labels downscale into a
-// grey haze between the letters.
+// snowb.org bitmap font; all HUD text is drawn with it, tinted per-use via setTintFill. Export at ~100px with
+// a few px glyph spacing - large + tight packing makes small labels downscale into a grey haze.
 const FONT = 'orbitron';
 
-// --- Fleet bar geometry.  A row of tappable ship chips across the bottom band; when more types are unlocked than
-// fit the width, the row is dragged left/right to reach the rest (see the drag handling in create). ---
+// Fleet bar: a row of tappable ship chips across the bottom band, dragged left/right when they overflow.
 const CHIP_WIDTH = 132;
 const CHIP_HEIGHT = 96;
 const CHIP_GAP = 12;
 const CHIP_ICON_BOX = 46;
-// A pointer that moves more than this between press and release was a drag of the fleet bar, not a tap on a chip.
+// A pointer that moves more than this between press and release was a drag, not a tap.
 const DRAG_THRESHOLD = 10;
 
-// --- Card / drawer button geometry, shared by the type card and the unlock drawer. ---
 const BUTTON_WIDTH = 200;
 const BUTTON_HEIGHT = 56;
 
-// --- Unlock drawer geometry.  The panel is sized large enough that a two-column grid of every lockable type sits
-// inside its frame with padding all round; the offsets below are measured from the panel's centre. ---
+// Unlock drawer geometry; offsets measured from the panel's centre.
 const DRAWER_PANEL_WIDTH = 680;
 const DRAWER_PANEL_HEIGHT = 920;
-// The window art carries a title bubble near its top; the heading sits in it, and the grid starts below it.
 const DRAWER_HEADING_Y = -324;
 const DRAWER_ROWS_Y = -186;
 const DRAWER_CLOSE_Y = 372;
-// The two columns' centres (±) and the vertical pitch between rows; each cell stacks a name over its unlock button.
 const DRAWER_COLUMN_X = 150;
 const DRAWER_ROW_HEIGHT = 108;
 const DRAWER_UNLOCK_WIDTH = 244;
 const DRAWER_UNLOCK_HEIGHT = 56;
-// The type's silhouette rides on the left of its unlock button, with the "Unlock $x" label shifted right to clear it.
 const DRAWER_ICON_BOX = 34;
 const DRAWER_ICON_X = -84;
 const DRAWER_LABEL_X = 24;
 
-// One ship chip in the fleet bar: an icon over its live launch rate, on a button background that opens the card.
 interface Chip {
 	container: Phaser.GameObjects.Container
 	icon: Phaser.GameObjects.Image
 	rateText: Phaser.GameObjects.BitmapText
 }
 
-// The disabled tint / alpha an unaffordable button is drawn with, so cost + affordability read at a glance.
 const AFFORD_TINT = 0xffffff;
 const DENY_TINT = 0x8899aa;
 
-// How long a level-change toast stays up before it dismisses itself, in milliseconds.  A tap dismisses it sooner.
+// Milliseconds before a level-change toast dismisses itself; a tap dismisses it sooner.
 const TOAST_DURATION = 10000;
 
-// The sci-fi HUD + menus, drawn as a second scene running on top of the game so it never gets cleared by the
-// simulation.  It is purely presentational: every frame it reads the GameScene's public getters (player money,
-// fleet size, the per-type ShipRoster) and reflects them, and its interactive controls - the fleet bar chips, the
-// type card's buy buttons, the unlock drawer, and the win/lose dialog - call straight back into the GameScene /
-// its roster.  Art is from the spacegameguiset kit under public/ui; text is the Orbitron bitmap font.
+// The HUD + menus, a second scene on top of the game. Purely presentational: reads GameScene's public getters
+// each frame and its controls call back into the GameScene / its roster.
 export default class UIScene extends Phaser.Scene {
 	private gameScene!: GameScene;
 
@@ -70,8 +56,7 @@ export default class UIScene extends Phaser.Scene {
 	private moneyText!: Phaser.GameObjects.BitmapText;
 	private fleetText!: Phaser.GameObjects.BitmapText;
 
-	// The fleet bar: a draggable container of one chip per ship type (locked types stay hidden) plus a trailing
-	// "＋" chip that opens the unlock drawer.
+	// One chip per ship type (locked types hidden) plus a trailing "＋" chip that opens the unlock drawer.
 	private fleetBar!: Phaser.GameObjects.Container;
 	private chips = new Map<ShipType, Chip>();
 	private plusChip!: Phaser.GameObjects.Container;
@@ -80,39 +65,31 @@ export default class UIScene extends Phaser.Scene {
 	private dragStartBarX = 0;
 	private dragging = false;
 
-	// The per-type card, opened by tapping a chip: the type's stats and its two buy buttons.  One reusable card
-	// retargeted to whichever type is open (null = closed).
+	// One reusable per-type card, retargeted to whichever type is open (null = closed).
 	private card!: Phaser.GameObjects.Container;
-	// A full-screen, invisible click-catcher shown behind the card so a tap anywhere off it closes the card.
+	// Full-screen click-catcher behind the card so a tap off it closes the card.
 	private cardBackdrop!: Phaser.GameObjects.Rectangle;
 	private cardType: ShipType | null = null;
 	private cardTitle!: Phaser.GameObjects.BitmapText;
 	private cardStats!: Phaser.GameObjects.BitmapText;
-	// A one-line preview of what the next Level buy grants this type (e.g. "Next level: +2 shields, +1 damage").
 	private cardUpgradeText!: Phaser.GameObjects.BitmapText;
 	private cardRateButton!: Phaser.GameObjects.Image;
 	private cardRateLabel!: Phaser.GameObjects.BitmapText;
 	private cardLevelButton!: Phaser.GameObjects.Image;
 	private cardLevelLabel!: Phaser.GameObjects.BitmapText;
 
-	// The unlock drawer: a modal list of the still-locked types and their unlock prices, rebuilt each time it opens
-	// (and after an unlock) since the locked set shrinks as types are bought.
+	// Modal list of still-locked types + prices, rebuilt on open and after each unlock.
 	private drawer!: Phaser.GameObjects.Container;
 	private drawerRows!: Phaser.GameObjects.Container;
 	private drawerEmpty!: Phaser.GameObjects.BitmapText;
-	// One entry per locked-type cell currently in the drawer, so each frame's affordability pass can dim both the
-	// unlock button and its ship icon without re-deriving which child is which (a cell now has two images).
 	private drawerCells: Array<{ type: ShipType, button: Phaser.GameObjects.Image, icon: Phaser.GameObjects.Image }> = [];
 
-	// A banner across the top of the play area announcing an automatic level jump (advanced on a win, dropped back on
-	// a loss - see GameScene).  It replaces the old win/lose dialog: the match resolves and reloads on its own, and
-	// this is shown on the level the reload lands on to tell the player what happened.  Auto-dismisses after
-	// TOAST_DURATION, or on a tap.
+	// Banner announcing an automatic level jump (see GameScene). Auto-dismisses after TOAST_DURATION, or on a tap.
 	private toast!: Phaser.GameObjects.Container;
 	private toastText!: Phaser.GameObjects.BitmapText;
 	private toastTimer?: Phaser.Time.TimerEvent;
 
-	// Developer stats overlay, hidden until the player toggles it with the backtick (`) key.
+	// Developer stats overlay, toggled with the backtick (`) key.
 	private statsPanel!: Phaser.GameObjects.Container;
 	private statsText!: Phaser.GameObjects.BitmapText;
 	private statsVisible = false;
@@ -125,13 +102,11 @@ export default class UIScene extends Phaser.Scene {
 		this.load.image('ui-window', 'ui/window_whole.png');
 		this.load.image('ui-button', 'ui/button_small_long_blue.png');
 		this.load.image('ui-button-green', 'ui/button_small_long_green.png');
-		// The chips draw the same ship silhouettes the game does; load them here too so the UI scene is self-
-		// sufficient (Phaser skips any key the GameScene has already loaded).
+		// Chips reuse the game's ship silhouettes; load them here too (Phaser skips already-loaded keys).
 		this.load.image('boid', 'boid.png');
 		for(const type of SHIP_TYPES) {
 			this.load.image(type, SHIP_TYPE_DEFS[type].sprite);
 		}
-		// Phaser loads the .png atlas + its .fnt (BMFont XML) descriptor and renders any size from the baked glyphs.
 		this.load.bitmapFont(FONT, 'ui/orbitron.png', 'ui/orbitron.fnt');
 	}
 
@@ -139,9 +114,7 @@ export default class UIScene extends Phaser.Scene {
 		this.gameScene = this.scene.get('game') as GameScene;
 		const { width, height } = this.scale;
 
-		// --- Top HUD band: level title, then player kill-reward money + fleet size on a second row ---
-		// Bitmap glyphs are tinted with FILL mode: the tint colour replaces the glyph's RGB and only its alpha is
-		// used for shape, so the text colours correctly no matter what colour the exported atlas glyphs are.
+		// Top HUD band: level title, then money + fleet size on a second row.
 		this.levelText = this.add.bitmapText(width / 2, 30, FONT, '', 22)
 			.setOrigin(0.5).setCenterAlign().setTintFill(0xcfe6ff);
 		this.moneyText = this.add.bitmapText(24, 74, FONT, '', 28).setOrigin(0, 0.5).setTintFill(0xffd54a);
@@ -170,20 +143,18 @@ export default class UIScene extends Phaser.Scene {
 			}
 		}
 
-		// Once the match is decided the scene freezes and swaps levels on its own (see GameScene) - close the roster
-		// overlays so a stray tap in that brief window can't try to buy against a station that may already be gone.
+		// Once the match is decided, close the overlays so a stray tap can't buy against a gone station.
 		if(this.gameScene.gameState !== 'playing') {
 			this.closeCard();
 			this.closeDrawer();
 		}
 
-		// A level jump leaves a one-line notice for the toast; show it the frame it appears.
 		const notice = this.gameScene.takeNotice();
 		if(notice) {
 			this.showToast(notice);
 		}
 
-		// Only spend the string-building work when the overlay is actually on screen.
+		// Only build the string when the overlay is on screen.
 		if(this.statsVisible) {
 			this.statsText.setText(formatStats(this.gameScene.stats));
 		}
@@ -195,8 +166,7 @@ export default class UIScene extends Phaser.Scene {
 		const barY = height - HUD_BOTTOM_HEIGHT / 2;
 		this.fleetBar = this.add.container(0, barY);
 
-		// One chip per type, all built up front and shown/hidden + laid out each frame by refreshFleetBar; the icon
-		// is the type's silhouette tinted the player's colour, over its live launch rate.
+		// One chip per type, built up front; refreshFleetBar shows/hides and lays them out each frame.
 		for(const type of SHIP_TYPES) {
 			const background = this.add.image(0, 0, 'ui-button')
 				.setDisplaySize(CHIP_WIDTH, CHIP_HEIGHT)
@@ -209,7 +179,7 @@ export default class UIScene extends Phaser.Scene {
 			const container = this.add.container(0, 0, [background, icon, rateText]);
 			this.fleetBar.add(container);
 
-			// A press that did not turn into a drag of the whole bar opens this type's card.
+			// A press that didn't turn into a drag opens this type's card.
 			background.on('pointerup', () => {
 				if(!this.dragging) {
 					this.openCard(type);
@@ -219,7 +189,7 @@ export default class UIScene extends Phaser.Scene {
 			this.chips.set(type, { container, icon, rateText });
 		}
 
-		// The trailing "＋" chip: opens the unlock drawer.  Shown only while something is still locked.
+		// The trailing "＋" chip, shown only while something is still locked.
 		const plusBackground = this.add.image(0, 0, 'ui-button-green')
 			.setDisplaySize(CHIP_WIDTH, CHIP_HEIGHT)
 			.setInteractive({ useHandCursor: true });
@@ -232,9 +202,8 @@ export default class UIScene extends Phaser.Scene {
 			}
 		});
 
-		// Drag the whole bar horizontally to reach chips off the edge.  The scene-level pointer events fire whatever
-		// is tapped, so they drive the drag while each chip's own pointerup still handles a tap - a gesture that
-		// moves past DRAG_THRESHOLD sets `dragging`, which the chip handlers check to tell a scroll from a tap.
+		// Scene-level pointer events drive the horizontal drag; a gesture past DRAG_THRESHOLD sets `dragging`,
+		// which the chip handlers check to tell a scroll from a tap.
 		this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
 			if(!this.canDragFleetBar(pointer, height)) {
 				return;
@@ -255,13 +224,13 @@ export default class UIScene extends Phaser.Scene {
 		});
 	}
 
-	// The fleet bar is only draggable while no overlay is up and the gesture is in the bottom band it lives in.
+	// Draggable only while no overlay is up and the gesture is in the bottom band.
 	private canDragFleetBar(pointer: Phaser.Input.Pointer, height: number): boolean {
 		return !this.card.visible && !this.drawer.visible
 			&& pointer.y >= height - HUD_BOTTOM_HEIGHT;
 	}
 
-	// Scales a ship icon to fit a square box of the given size without stretching its silhouette.
+	// Scales an icon to fit a square box without stretching.
 	private fitIcon(icon: Phaser.GameObjects.Image, box: number) {
 		const scale = Math.min(box / icon.width, box / icon.height);
 		icon.setScale(scale);
@@ -269,8 +238,7 @@ export default class UIScene extends Phaser.Scene {
 
 	private refreshFleetBar(roster: ShipRoster) {
 		const { width } = this.scale;
-		// Gather the chips shown this frame in roster order, hiding the locked ones; the "＋" chip trails the last
-		// unlocked one whenever anything is still locked.  The actual positioning + sizing happens in the pass below.
+		// Gather the chips shown this frame, hiding locked ones; the "＋" chip trails whenever anything is locked.
 		const visible: Array<Phaser.GameObjects.Container> = [];
 		let anyLocked = false;
 		for(const type of SHIP_TYPES) {
@@ -282,7 +250,7 @@ export default class UIScene extends Phaser.Scene {
 			}
 			chip.container.setVisible(true);
 			chip.rateText.setText(`+${roster.rate(type)}/s`);
-			// A chip glows brighter when either of its upgrades is affordable, hinting there is something to spend on.
+			// Brighter when either upgrade is affordable.
 			const canBuy = roster.canBuyRate(type) || roster.canBuyLevel(type);
 			chip.container.setAlpha(canBuy ? 1 : 0.8);
 			visible.push(chip.container);
@@ -298,9 +266,7 @@ export default class UIScene extends Phaser.Scene {
 			return;
 		}
 
-		// Fit the whole row on screen at once.  The chips keep their natural size while the row fits, then shrink
-		// uniformly once it would overflow the available width - so they all stay visible no matter how many are
-		// unlocked.  The row is centred, so a couple of chips sit in the middle rather than pinned to the left edge.
+		// Chips keep natural size while the row fits, then shrink uniformly on overflow; centred.
 		const count = visible.length;
 		const naturalWidth = count * CHIP_WIDTH + (count - 1) * CHIP_GAP;
 		const availableWidth = width - 2 * CHIP_GAP;
@@ -313,7 +279,7 @@ export default class UIScene extends Phaser.Scene {
 			x += pitch;
 		}
 
-		// The row always fits now, so the bar itself never needs to be scrolled.
+		// The row always fits now, so the bar never needs scrolling.
 		this.fleetBarMinX = 0;
 		this.fleetBar.x = 0;
 	}
@@ -331,27 +297,20 @@ export default class UIScene extends Phaser.Scene {
 	// --- Type card -------------------------------------------------------------------------------------------
 
 	private buildCard(width: number, height: number) {
-		// The card sits just above the fleet bar, centred on the canvas width.  The offset clears its taller frame so
-		// the bottom edge still stops short of the fleet bar band below.
 		const cardY = height - HUD_BOTTOM_HEIGHT - 200;
 
-		// A full-screen click-catcher behind the card (invisible, but interactive): a tap that lands here - i.e. off
-		// the card - closes it.  The panel below is made interactive too so taps on the card's own blank areas hit it
-		// (Phaser delivers only to the top-most object) and are swallowed rather than falling through to this backdrop.
+		// Full-screen click-catcher; a tap off the card closes it. The panel is interactive too so taps on its
+		// own blank areas are swallowed rather than falling through to this backdrop.
 		this.cardBackdrop = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0)
 			.setInteractive()
 			.setDepth(49)
 			.setVisible(false);
 		this.cardBackdrop.on('pointerup', () => this.closeCard());
 
-		// A touch taller than the two-line card it grew from, to seat the extra combat-stat line and the next-level
-		// preview above the buy buttons without crowding them.
 		const panel = this.add.image(0, 0, 'ui-window').setDisplaySize(460, 360).setInteractive();
 
 		this.cardTitle = this.add.bitmapText(0, -132, FONT, '', 26).setOrigin(0.5).setCenterAlign().setTintFill(0xcfe6ff);
 		this.cardStats = this.add.bitmapText(0, -58, FONT, '', 18).setOrigin(0.5).setCenterAlign().setTintFill(0x8fd6ff);
-		// The next-level preview sits between the stats and the buttons, tinted gold like the money read so it draws the
-		// eye to what a Level buy pays for.
 		this.cardUpgradeText = this.add.bitmapText(0, 24, FONT, '', 16).setOrigin(0.5).setCenterAlign().setTintFill(0xffd54a);
 
 		this.cardRateButton = this.add.image(-114, 96, 'ui-button')
@@ -376,7 +335,6 @@ export default class UIScene extends Phaser.Scene {
 			}
 		});
 
-		// A small close control in the card's top-right corner.
 		const closeButton = this.add.image(206, -150, 'ui-button')
 			.setDisplaySize(48, 48)
 			.setInteractive({ useHandCursor: true })
@@ -409,8 +367,7 @@ export default class UIScene extends Phaser.Scene {
 		const level = roster.level(type);
 		this.cardTitle.setText(def.name);
 
-		// The last stat line is the type's own offence - its bullet / missile / blast damage, or a Carrier's drone
-		// count - so each card names what it fights with instead of a generic "damage".
+		// The last stat line names the type's own offence (bullet/missile/blast damage, or a Carrier's drones).
 		const stat = combatStat(def, level);
 		this.cardStats.setText(
 			`Rate  +${roster.rate(type)}/s\n`
@@ -437,11 +394,9 @@ export default class UIScene extends Phaser.Scene {
 	private buildDrawer(width: number, height: number) {
 		const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x03060f, 0.72)
 			.setInteractive();
-		// Tapping the dimmed backdrop closes the drawer.
 		overlay.on('pointerup', () => this.closeDrawer());
 
-		// The panel is made interactive so a tap on its blank frame is swallowed here (Phaser delivers only to the
-		// top-most object) instead of falling through to the backdrop overlay behind it and closing the drawer.
+		// Interactive so a tap on its blank frame is swallowed rather than falling through to the backdrop.
 		const panel = this.add.image(width / 2, height / 2, 'ui-window').setDisplaySize(DRAWER_PANEL_WIDTH, DRAWER_PANEL_HEIGHT)
 			.setInteractive();
 		const heading = this.add.bitmapText(width / 2, height / 2 + DRAWER_HEADING_Y, FONT, 'UNLOCK SHIPS', 30)
@@ -449,7 +404,7 @@ export default class UIScene extends Phaser.Scene {
 		this.drawerEmpty = this.add.bitmapText(width / 2, height / 2, FONT, 'Every ship is unlocked.', 20)
 			.setOrigin(0.5).setCenterAlign().setTintFill(0x8fd6ff).setVisible(false);
 
-		// The rows live in their own container so a rebuild only clears/rebuilds this, not the panel + heading.
+		// Rows in their own container so a rebuild only touches this, not the panel + heading.
 		this.drawerRows = this.add.container(width / 2, height / 2 + DRAWER_ROWS_Y);
 
 		const closeButton = this.add.image(width / 2, height / 2 + DRAWER_CLOSE_Y, 'ui-button-green')
@@ -475,9 +430,7 @@ export default class UIScene extends Phaser.Scene {
 		this.drawer.setVisible(false);
 	}
 
-	// Rebuild the list of locked-type cells from scratch: the locked set only changes on an unlock, so this runs on
-	// open and after each unlock rather than every frame.  Laid out in two columns so the whole roster (up to ~10
-	// types) fits the panel without scrolling; each cell stacks the type's name over its unlock button.
+	// Two columns so the whole roster (~10 types) fits without scrolling; each cell stacks name over unlock button.
 	private rebuildDrawerRows(roster: ShipRoster) {
 		this.drawerRows.removeAll(true);
 		this.drawerCells = [];
@@ -494,8 +447,6 @@ export default class UIScene extends Phaser.Scene {
 			const button = this.add.image(x, y + 18, 'ui-button')
 				.setDisplaySize(DRAWER_UNLOCK_WIDTH, DRAWER_UNLOCK_HEIGHT)
 				.setInteractive({ useHandCursor: true });
-			// The type's silhouette sits on the left of the button (drawn after it so it rides on top), tinted the
-			// player's colour like its ships; the price label shifts right to make room.
 			const icon = this.add.image(x + DRAWER_ICON_X, y + 18, this.textures.exists(type) ? type : 'boid')
 				.setTint(this.gameScene.playerColor);
 			this.fitIcon(icon, DRAWER_ICON_BOX);
@@ -503,7 +454,6 @@ export default class UIScene extends Phaser.Scene {
 				.setOrigin(0.5).setCenterAlign().setTintFill(0xffffff);
 			button.on('pointerup', () => {
 				if(roster.unlock(type)) {
-					// A successful unlock drops this type off the locked list, so rebuild it (and reveal its chip).
 					this.rebuildDrawerRows(roster);
 				}
 			});
@@ -513,8 +463,7 @@ export default class UIScene extends Phaser.Scene {
 		});
 	}
 
-	// Each frame the drawer is open: keep each cell's affordability in step with the player's money as it ticks up
-	// from kills, dimming both the unlock button and its ship icon when the type is out of reach.
+	// Each frame the drawer is open: dim the button and icon of any type out of reach.
 	private refreshDrawer(roster: ShipRoster) {
 		for(const cell of this.drawerCells) {
 			const affordable = roster.canUnlock(cell.type);
@@ -545,9 +494,7 @@ export default class UIScene extends Phaser.Scene {
 
 	// --- Level-change toast ----------------------------------------------------------------------------------
 
-	// A banner pinned across the top of the play area, just under the money/fleet row so it never covers those
-	// readouts.  Built hidden; showToast fills and reveals it.  The background is interactive so a tap anywhere on
-	// the banner dismisses it early (the label on top isn't interactive, so taps fall through to the background).
+	// Built hidden; showToast fills and reveals it. Background interactive so a tap anywhere dismisses it early.
 	private buildToast(width: number) {
 		const y = HUD_TOP_HEIGHT + 34;
 		const background = this.add.rectangle(0, 0, width - 48, 56, 0x0a1c33, 0.94)
@@ -563,7 +510,7 @@ export default class UIScene extends Phaser.Scene {
 	private showToast(notice: LevelNotice) {
 		this.toastText.setText(notice.message).setTintFill(notice.tone === 'good' ? 0x7cfc66 : 0xff8a8a);
 		this.toast.setVisible(true);
-		// Restart the countdown if a toast was somehow already up, so the newest message gets its full dwell.
+		// Restart the countdown so the newest message gets its full dwell.
 		this.toastTimer?.remove();
 		this.toastTimer = this.time.delayedCall(TOAST_DURATION, () => this.hideToast());
 	}

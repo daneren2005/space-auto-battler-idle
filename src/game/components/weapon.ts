@@ -1,16 +1,8 @@
 import type { ComponentDefinition } from '@daneren2005/shared-memory-ecs';
 
-// weapon: everything a ship needs to fire projectiles at its target.  Only armed ship types carry it (the
-// weapon system's query requires it, so a rammer like the Skiff simply never fires).  A weapon is described by
-// one nested `weapon` object on the entity config rather than a spray of flat fields, so a ship type reads as a
-// single block of intent (see the ship roster in plans/03-ship-roster.md).
-//
-// All but `timeSinceFired` are static config: `range` (how close a target must be to fire), `fireInterval`
-// (seconds between volleys), `projectileCount` + `spread` (how many shots per volley and the total angular fan
-// they leave in), `projectileSpeed`, `damage` per shot, `homing` (whether the shots steer) with `homingTurn` as
-// their steer force, and `spawnsDrones` (whether a volley launches drone sub-ships instead of projectiles - the
-// Carrier).  `timeSinceFired` is the runtime cooldown clock, advanced by the weapon update; it starts at
-// `fireInterval` so a ship can fire the instant it acquires a target rather than after a full cooldown.
+// weapon: everything an armed ship needs to fire. Only armed types carry it (the weapon query requires it). All
+// but `timeSinceFired` are static config; `timeSinceFired` is the cooldown clock, started at `fireInterval` so a
+// ship can fire the instant it acquires a target.
 
 // Block layout (Float32Array, size 10).
 export const WEAPON_RANGE = 0;
@@ -24,7 +16,6 @@ export const WEAPON_HOMING_TURN = 7;
 export const WEAPON_SPAWNS_DRONES = 8;
 export const WEAPON_TIME_SINCE_FIRED = 9;
 
-// The default steer force a homing shot turns at when a weapon does not name its own.
 const DEFAULT_HOMING_TURN = 30;
 
 export interface WeaponSettings {
@@ -53,11 +44,9 @@ export interface WeaponComponent {
 }
 export interface WeaponConfig {
 	weapon: WeaponSettings
-	// A per-spawn override of the weapon's per-shot damage, so the spawn worker can stamp the level-scaled value
-	// without rewriting the whole nested `weapon` object.  Falls back to the weapon's own `damage` when absent.
+	// Per-spawn override of per-shot damage, stamped by the spawn worker with the level-scaled value.
 	weaponDamage?: number
-	// A per-spawn override of the volley's shot/drone count, likewise stamped by the spawn worker for a type whose
-	// count scales with level (the Carrier's drone swarm).  Falls back to the weapon's own count when absent.
+	// Per-spawn override of the volley's shot/drone count, for a type whose count scales with level (the Carrier).
 	weaponProjectileCount?: number
 }
 export const weaponDefinition: ComponentDefinition<WeaponComponent, Float32Array, WeaponConfig> = {
@@ -69,12 +58,11 @@ export const weaponDefinition: ComponentDefinition<WeaponComponent, Float32Array
 		const index = memory.create([
 			weapon.range,
 			weapon.fireInterval,
-			// The spawn worker stamps the level-scaled count here (the Carrier's drones); a directly-placed ship uses
-			// the def's own.
+			// Spawn worker stamps the level-scaled count; a directly-placed ship uses the def's own.
 			config.weaponProjectileCount ?? weapon.projectileCount ?? 1,
 			weapon.spread ?? 0,
 			weapon.projectileSpeed,
-			// The spawn worker stamps the level-scaled per-shot damage here; a directly-placed ship uses the def's own.
+			// Spawn worker stamps the level-scaled per-shot damage; a directly-placed ship uses the def's own.
 			config.weaponDamage ?? weapon.damage,
 			weapon.homing ? 1 : 0,
 			weapon.homingTurn ?? DEFAULT_HOMING_TURN,

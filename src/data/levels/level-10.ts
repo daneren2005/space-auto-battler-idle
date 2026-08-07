@@ -4,11 +4,8 @@ import { PLAYER_COLOR, ENEMY_COLOR } from '@/data/colors';
 import { factionCollision } from '@/data/collide-categories';
 import { PLAYER_START_SHIPS } from './player-start';
 
-// Act III - Fortress (levels 10-14): the enemy fields tanks and snipers at steeply climbing levels, so the fights
-// are now attrition against armour rather than races to out-spawn.  Level 10 is the pure fortress: a pair of
-// levelled Bulwarks - a rolling shield wall soaking everything - behind a Gunner battery.  Chipping through this
-// with Skiffs alone is hopeless; it is the level that sells the Railgun (one heavy slug per Bulwark) and the
-// Detonator (blast that ignores the shield-per-hit trade).  A single centre station, but a very hard one.
+// Act III - Fortress: tanks and snipers at steep levels, so fights are attrition against armour. Level 10 is the
+// pure fortress - a pair of levelled Bulwarks behind a Gunner battery - which sells the Railgun and Detonator.
 const WIDTH = 500;
 const HEIGHT = 840;
 const MARGIN = 110;

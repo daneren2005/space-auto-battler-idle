@@ -1,8 +1,7 @@
 import type { ComponentDefinition } from '@daneren2005/shared-memory-ecs';
 
-// health: shields + the timers that regenerate them and gate incoming damage.  maxShields /
-// timeToRegenerateShields / damageCooldown are Config; current shields are the only runtime state worth
-// persisting.  All timers are in seconds.
+// health: shields + the timers that regenerate them and gate incoming damage. Current shields are the only
+// runtime state worth persisting. All timers are in seconds.
 
 // Block layout (Float32Array, size 6).
 export const HEALTH_SHIELDS = 0;

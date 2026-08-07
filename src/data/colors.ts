@@ -1,6 +1,4 @@
-// The single source of truth for faction colours.  Levels (and generateScene) reference these by name instead
-// of re-declaring hex literals, so a faction looks the same in every level it appears in and a palette tweak
-// only has to happen here.  Colours are Phaser-style 24-bit RGB ints.
+// Single source of truth for faction colours (Phaser-style 24-bit RGB ints); levels reference these by name.
 export const FACTION_COLORS = {
 	player: 0x2962ff, // blue
 	enemy: 0xd50000, // red
@@ -19,12 +17,10 @@ export type FactionName = keyof typeof FACTION_COLORS;
 export const PLAYER_COLOR = FACTION_COLORS.player;
 export const ENEMY_COLOR = FACTION_COLORS.enemy;
 
-// The same colours as a list, in declaration order, for callers that need to hand out one colour per faction
-// without caring which is which (multi-faction levels, generated scenes).
+// The colours as a list, for callers handing out one per faction (multi-faction levels, generated scenes).
 export const FACTION_PALETTE: Array<number> = Object.values(FACTION_COLORS);
 
-// Picks the nth faction colour, wrapping around once the palette runs out so any number of factions gets a
-// colour rather than an undefined.
+// The nth faction colour, wrapping once the palette runs out.
 export function factionColor(index: number): number {
 	return FACTION_PALETTE[Math.abs(Math.trunc(index)) % FACTION_PALETTE.length];
 }

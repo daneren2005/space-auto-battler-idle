@@ -4,10 +4,8 @@ import { PLAYER_COLOR, ENEMY_COLOR } from '@/data/colors';
 import { factionCollision } from '@/data/collide-categories';
 import { PLAYER_START_SHIPS } from './player-start';
 
-// Act II finale (see level-5.ts): the same two allied flank stations as level 8, but heavier - a denser Wasp swarm
-// and a levelled Gunner battery - so the counters the act has been pushing (homing for the swarm, ranged fire for
-// the escorts) are now close to required rather than merely helpful.  Clearing this is the gate into Act III's
-// fortress fights.  Both enemy bases share faction 1 / the enemy colour, so they gang up rather than trade fire.
+// Act II finale: the two flank stations from level 8, but heavier - a denser Wasp swarm and a levelled Gunner
+// battery - so the act's counters are now close to required. The gate into Act III.
 const WIDTH = 460;
 const HEIGHT = 760;
 const MARGIN = 100;

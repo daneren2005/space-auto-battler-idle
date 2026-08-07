@@ -4,11 +4,8 @@ import { PLAYER_COLOR, ENEMY_COLOR } from '@/data/colors';
 import { factionCollision } from '@/data/collide-categories';
 import { PLAYER_START_SHIPS } from './player-start';
 
-// Act III (see level-10.ts): both fortress fronts thicken and the map grows again.  The armour side now doubles
-// its Bulwarks and adds a Wasp swarm to screen them; the sniper side raises the Railgun a level and backs it with
-// a Scatter Gun that shreds anything the player commits to a close rush.  Every archetype the roster answers -
-// tank, sniper, swarm, spread - is now on the field at once, which is the point of the act: no single player type
-// covers it, so the fleet has to be broad.
+// Act III: both fortress fronts thicken - the armour side doubles Bulwarks and adds a Wasp swarm, the sniper side
+// backs its Railgun with a Scatter Gun. Every archetype is now on the field at once, so the fleet must be broad.
 const WIDTH = 540;
 const HEIGHT = 900;
 const MARGIN = 120;

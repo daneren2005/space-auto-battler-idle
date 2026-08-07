@@ -9,13 +9,11 @@ export function createUpdateProjectilesSystem(world: BaseWorld<typeof registry>)
 	return new GameComponentSystem(world, {
 		name: 'updateProjectilesSystem',
 		required: ['projectile', 'transform', 'velocity'],
-		// `entity` is what killEntityWorker flags dead; it lives outside this game's registry so it is requested
-		// here as an optional block rather than a required one.
+		// `entity` is what killEntityWorker flags dead; outside this registry, so requested as optional.
 		optional: ['entity'],
 		updateFunction: updateProjectilesUpdate,
 		getWorker: () => new UpdateProjectilesWorker(),
 		queries: {
-			// Every possible target's position, so a homing shot can look up whoever it is chasing.
 			targets: { required: ['transform'] },
 		},
 	});

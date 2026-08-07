@@ -4,10 +4,8 @@ import { PLAYER_COLOR, ENEMY_COLOR } from '@/data/colors';
 import { factionCollision } from '@/data/collide-categories';
 import { PLAYER_START_SHIPS } from './player-start';
 
-// Act III (see level-10.ts): the fortress splits across two allied flank stations - one an armour bastion
-// (Bulwark plus a Skiff screen), the other a sniper nest built around a Railgun Lancer whose long slugs reach the
-// player's line from clear across the field before it can close.  The player now has to answer two problems at
-// once - crack the wall on one side, kill or outrange the sniper on the other - from a fleet split to cover both.
+// Act III: the fortress splits into two allied flanks - an armour bastion (Bulwark + Skiff screen) and a sniper
+// nest (Railgun Lancer) - so the player must crack the wall and outrange the sniper at once.
 const WIDTH = 500;
 const HEIGHT = 840;
 const MARGIN = 110;

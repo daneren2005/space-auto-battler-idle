@@ -4,10 +4,8 @@ import { PLAYER_COLOR, ENEMY_COLOR } from '@/data/colors';
 import { factionCollision } from '@/data/collide-categories';
 import { PLAYER_START_SHIPS } from './player-start';
 
-// Act III (see level-10.ts): the enemy levels climb steeply - a level-5 Bulwark is a near-immovable wall - and a
-// Stormcaller joins in, its homing arcs raking whatever clusters up.  This is the hardest two-station fight before
-// Act IV opens a third front: the player's whole broad fleet, well levelled, should just carry it, and a narrow or
-// under-levelled one should stall - the intended "a little behind" pinch right before the onslaught.
+// Act III: enemy levels climb steeply (a level-5 Bulwark is near-immovable) and a Stormcaller joins in. The
+// hardest two-station fight before Act IV opens a third front.
 const WIDTH = 540;
 const HEIGHT = 900;
 const MARGIN = 120;

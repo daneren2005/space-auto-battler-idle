@@ -4,12 +4,11 @@ import GameComponentSystem from './game-component-system';
 import { spawnShipUpdate } from './spawn-ship-update';
 import SpawnShipWorker from './spawn-ship.worker?worker';
 
-// Spend money to spawn ships.
+// Stations launch ships from their hangar production lines.
 export function createSpawnShipSystem(world: BaseWorld<typeof registry>) {
 	return new GameComponentSystem(world, {
 		name: 'spawnShipSystem',
-		// The hangar holds each production line's rate + level; the body is required because a spawned ship inherits
-		// its station's collide category + mask from it.
+		// body is required because a spawned ship inherits its station's collide category + mask.
 		required: ['hangar', 'transform', 'body'],
 		updateFunction: spawnShipUpdate,
 		getWorker: () => new SpawnShipWorker(),

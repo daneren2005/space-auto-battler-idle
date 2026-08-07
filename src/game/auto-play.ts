@@ -1,13 +1,9 @@
-// The headless auto-player engine: it drives the real GameWorld through a campaign, stepping the simulation at a
-// fixed rate and, between every step, buying the single cheapest upgrade or ship unlock it can afford.  It is a
-// pure simulation with no IO - it yields a stream of structured events (a buy, a level won / lost, the run ending)
-// which the scripts/ai-run.ts wrapper formats into its report.  Keeping it here (rather than in the script) is
-// what lets it be unit-tested against a real world, the same way GameWorld's own game-loop tests drive it.
+// Headless auto-player: drives the real GameWorld through a campaign, stepping at a fixed rate and buying the
+// cheapest affordable upgrade between steps. Pure, IO-free - it yields structured events that scripts/ai-run.ts
+// formats. Living here lets it be unit-tested against a real world.
 //
-// Under Node there is no `Worker` global, so shared-memory-ecs runs every system in-process and `world.update()`
-// settles a whole frame synchronously (see the vitest.config note) - which is exactly what makes a deterministic
-// auto-player possible.  Progression follows the shipped progressAfterMatch rules: a win climbs to the next level,
-// a loss drops back one, and either way the money + bought upgrades carry forward.
+// Under Node there is no `Worker` global, so every system runs in-process and `world.update()` settles a frame
+// synchronously - which is what makes a deterministic auto-player possible.
 import type { BaseEntity } from '@daneren2005/shared-memory-ecs';
 import GameWorld from './entities/game-world';
 import entityList from './entities/entity-list';
@@ -26,12 +22,11 @@ import { SHIP_TYPES, SHIP_TYPE_INDEX, type ShipType } from '@/data/ship-types';
 
 type Station = BaseEntity<Components>;
 
-// One simulation step: a fixed 1/60s frame, in milliseconds (which is what the world / physics measure time in).
+// One fixed 1/60s frame, in milliseconds.
 export const DEFAULT_STEP_MS = 1000 / 60;
-// Abandon a single level attempt that has not resolved after this much game time, so a stalemate can never hang the
-// run forever.  Generous - every balanced level resolves in well under a minute - so hitting it flags a problem.
+// Abandon a level attempt unresolved after this much game time, so a stalemate can't hang the run. Generous, so
+// hitting it flags a problem.
 export const DEFAULT_MAX_LEVEL_MS = 20 * 60 * 1000;
-// End the whole run once a single level has been lost more than this many times.
 export const DEFAULT_MAX_DEATHS_PER_LEVEL = 10;
 
 // One buyable action and what it costs right now.
@@ -41,8 +36,7 @@ export interface Action {
 	cost: number
 }
 
-// The cheapest action available on the roster right now, across every type's unlock / rate / level, or undefined
-// if the roster somehow offers nothing.  A locked type offers only its unlock; an unlocked one offers rate + level.
+// The cheapest action across every type's unlock / rate / level. A locked type offers only its unlock.
 export function cheapestAction(roster: ShipRoster): Action | undefined {
 	let best: Action | undefined;
 	for(const type of SHIP_TYPES) {
@@ -58,7 +52,6 @@ export function cheapestAction(roster: ShipRoster): Action | undefined {
 	return best;
 }
 
-// Apply a decided action to the roster (spending the money and bumping the rate / level / bought counters).
 export function applyAction(roster: ShipRoster, action: Action): void {
 	if(action.kind === 'unlock') {
 		roster.unlock(action.type);
@@ -69,9 +62,8 @@ export function applyAction(roster: ShipRoster, action: Action): void {
 	}
 }
 
-// The player faction's live state for a log line: its money and, per built type, its rate / level.  Read straight
-// off the station's own component accessors so it is valid both while the station is alive (a win) and during the
-// entity-removed event that fires the instant it is destroyed (a loss) - the one moment its memory is still live.
+// The player faction's live state for a log line: money and per-built-type rate / level. Read off the station's
+// accessors so it's valid both while alive (a win) and during the entity-removed event (a loss).
 export interface StationState {
 	money: number
 	summary: string
@@ -94,9 +86,8 @@ export function stationState(station: Station): StationState {
 	};
 }
 
-// Re-apply a carried run onto the freshly loaded player station: each type's bought rate / level add onto both the
-// value and the matching bought counter (rebuilding a self-unlocked type whole), and the money is banked.  Mirrors
-// GameScene.setupStationsAndCarry - safe as plain writes because nothing has simulated on the new world yet.
+// Re-apply a carried run onto the fresh player station. Mirrors GameScene.setupStationsAndCarry - safe as plain
+// writes because nothing has simulated on the new world yet.
 export function applyCarry(world: GameWorld, station: Station, carry: Carry): void {
 	const hangar = station.components.hangar;
 	const controller = station.components.controller;
@@ -118,8 +109,7 @@ export function applyCarry(world: GameWorld, station: Station, carry: Carry): vo
 	controller.money += carry.money;
 }
 
-// Whether the match on the current world is still being played, or has been decided: the player is alive while its
-// station exists, and the match is won once no enemy station is left, lost once the player's is gone.
+// Won once no enemy station is left, lost once the player's is gone.
 export function matchOutcome(world: GameWorld, playerEid: number): 'playing' | 'won' | 'lost' {
 	let playerAlive = false;
 	let enemyAlive = false;
@@ -140,18 +130,16 @@ export function matchOutcome(world: GameWorld, playerEid: number): 'playing' | '
 }
 
 export interface AutoPlayOptions {
-	// The campaign to play, in order.  Defaults to the shipped levels; a test can pass a small custom list.
+	// Defaults to the shipped levels; a test can pass a small custom list.
 	levels?: Array<LevelConfig>
 	stepMs?: number
 	maxLevelMs?: number
 	maxDeathsPerLevel?: number
 }
 
-// Why the run ended.
 export type AutoPlayEndReason = 'campaign-cleared' | 'deaths-exceeded' | 'stalled' | 'no-player';
 
-// Everything the auto-player emits as it plays, one object per event.  `totalMs` is the cumulative game time since
-// the run began (across every level and retry); `levelMs` on a decision is the time spent on that one attempt.
+// `totalMs` is cumulative game time since the run began; `levelMs` on a decision is time spent on that attempt.
 export type AutoPlayEvent =
 	| { type: 'level-start', levelIndex: number, level: LevelConfig, state: StationState, totalMs: number }
 	| { type: 'buy', action: Action, rate: number, level: number, moneyLeft: number, totalMs: number }
@@ -160,23 +148,20 @@ export type AutoPlayEvent =
 	| { type: 'stall', levelIndex: number, level: LevelConfig, levelMs: number, totalMs: number }
 	| { type: 'end', reason: AutoPlayEndReason, totalMs: number };
 
-// Plays the campaign to its end, yielding an event for every purchase and every level decision.  It owns the world
-// for the length of the run and destroys it when the generator finishes (including an early `break` by the
-// consumer), so a caller only has to iterate it.
+// Plays the campaign to its end, yielding an event per purchase and per level decision. Owns the world and
+// destroys it when the generator finishes (including an early `break`).
 export async function* autoPlay(options: AutoPlayOptions = {}): AsyncGenerator<AutoPlayEvent> {
 	const levels = options.levels ?? campaignLevels;
 	const stepMs = options.stepMs ?? DEFAULT_STEP_MS;
 	const maxLevelMs = options.maxLevelMs ?? DEFAULT_MAX_LEVEL_MS;
 	const maxDeaths = options.maxDeathsPerLevel ?? DEFAULT_MAX_DEATHS_PER_LEVEL;
 
-	// The next level's index within this run's own level list, so a custom campaign progresses through itself rather
-	// than being looked up against the shipped one.
+	// Index within this run's own level list, so a custom campaign progresses through itself.
 	const indexOf = (name: string) => levels.findIndex(level => level.name === name);
 
 	const world = new GameWorld();
 
-	// The player station of the level currently loaded, and the last state it was seen in - captured the instant it
-	// is destroyed so a loss can report what the player died holding (its memory is freed just after the event).
+	// The last state the player station was seen in, captured the instant it dies so a loss can report it.
 	let playerEid = -1;
 	let lossCarry: Carry = emptyCarry();
 	let lossState: StationState = { money: 0, summary: '(none)' };
@@ -193,7 +178,7 @@ export async function* autoPlay(options: AutoPlayOptions = {}): AsyncGenerator<A
 	const deaths: Array<number> = Array.from({ length: levels.length }, () => 0);
 
 	try {
-		// Each iteration plays one level attempt to a decision, emits it, then follows the progression rules onward.
+		// Each iteration plays one level attempt to a decision, then follows the progression rules onward.
 		for(;;) {
 			const level = levels[levelIndex];
 
@@ -215,7 +200,7 @@ export async function* autoPlay(options: AutoPlayOptions = {}): AsyncGenerator<A
 			let outcome: 'won' | 'lost' | 'stalled' = 'stalled';
 
 			while(levelMs < maxLevelMs) {
-				// Between steps: spend down to the cheapest thing out of reach, buying cheapest-first.
+				// Spend down, buying cheapest-first, until the cheapest is out of reach.
 				for(;;) {
 					const action = cheapestAction(roster);
 					if(!action || action.cost > roster.money) {
@@ -252,7 +237,6 @@ export async function* autoPlay(options: AutoPlayOptions = {}): AsyncGenerator<A
 			}
 
 			if(outcome === 'won') {
-				// Read the winning (still-alive) station directly for its ending state and carry.
 				yield { type: 'win', levelIndex, level, levelMs, state: stationState(player), totalMs };
 
 				const next = progressAfterMatch('won', levelIndex, nextLevelIndex, carryFromStation(player));
@@ -263,7 +247,7 @@ export async function* autoPlay(options: AutoPlayOptions = {}): AsyncGenerator<A
 				levelIndex = next.levelIndex;
 				carry = next.carry;
 			} else {
-				// Lost: the player station is already gone, so report the snapshot taken as it died.
+				// The player station is already gone, so report the snapshot taken as it died.
 				deaths[levelIndex]++;
 				yield { type: 'die', levelIndex, level, levelMs, state: lossState, deaths: deaths[levelIndex], totalMs };
 
@@ -273,7 +257,7 @@ export async function* autoPlay(options: AutoPlayOptions = {}): AsyncGenerator<A
 				}
 
 				const next = progressAfterMatch('lost', levelIndex, nextLevelIndex, lossCarry);
-				// A loss never resets, so `next` is always a Progress here; guard for the type all the same.
+				// A loss never resets; guard for the type all the same.
 				if(next !== 'reset') {
 					levelIndex = next.levelIndex;
 					carry = next.carry;

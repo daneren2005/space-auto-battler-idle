@@ -3,16 +3,10 @@ import type { Carry } from '@/data/progress';
 import { SHIP_TYPES, SHIP_TYPE_INDEX } from '@/data/ship-types';
 import type { Components } from './components';
 
-// Reads the carry a station is holding right now: its faction's unspent money, and per type the rate / level
-// upgrades that have been bought (the hangar's bought counters, which rebuild the whole line when re-applied on
-// the next load - see progress.ts / game-scene create()).  Only types with something bought are stored, so the
-// carry stays small and a locked type is simply absent.
-//
-// This takes the station entity directly rather than looking it up by eid because the one moment it matters most -
-// the player station being destroyed on a loss - the world has already removed the station from its map by the
-// time we can react, yet the entity object (and its component memory) is still live for the length of the
-// `entity-removed` event.  Passing the entity through lets the scene snapshot the carry there, so a defeat saves
-// what the player died holding instead of zeros read off a station that is already gone.
+// Reads the carry a station holds now: unspent money + per-type bought rate/level counters. Only types with
+// something bought are stored. Takes the entity directly (not an eid lookup) so it works during the
+// `entity-removed` event, when the station is off the world's map but its memory is still live - letting a loss
+// snapshot what the player died holding instead of zeros.
 export function carryFromStation(station: BaseEntity<Components>): Carry {
 	const hangar = station.components.hangar;
 	const carry: Carry = { money: station.components.controller?.money ?? 0, ships: {} };

@@ -6,9 +6,7 @@ import computeAngle from '@/math/compute-angle';
 import normalize from '@/math/normalize';
 import { PROJECTILE_REMAINING_LIFETIME, PROJECTILE_TARGET, PROJECTILE_TURN } from '../components/projectile';
 
-// The blocks this update touches.  `entity` is the block killEntityWorker needs to flag a shot dead; it is
-// declared optional (like physics-update does) because it is not part of this game's own registry, so it is
-// typed by hand rather than picked from ComponentArrays.
+// `entity` is what killEntityWorker needs to flag a shot dead; typed by hand since it's not in this registry.
 type ProjectileUpdateComponents = Pick<ComponentArrays, 'projectile' | 'transform' | 'velocity'> & {
 	entity?: Uint32Array
 };
@@ -21,11 +19,8 @@ type Scratch = ComponentSystemWorld & {
 	positionByEid?: Record<number, TargetPosition>
 };
 
-// Two jobs, one pass over every live projectile: count its lifetime down and kill it when it runs out (so
-// nothing flies forever), and - for a homing shot - steer it toward the enemy it was launched at.  The steering
-// mirrors move-to-target: nudge the velocity toward the target and renormalise to the shot's current speed, then
-// re-face it along the new heading.  A straight shot (no target / no turn) skips the steering and simply coasts,
-// and a homing shot whose target has since died finds no position and coasts too.
+// One pass per live projectile: count its lifetime down and kill it when it runs out, and - for a homing shot -
+// steer it toward its target (like move-to-target). A straight shot, or one whose target has died, coasts.
 export const updateProjectilesUpdate: EntityUpdateFunction<Components, ProjectileUpdateComponents> = (world, entityId, components, queries, callbacks) => {
 	const projectile = components.projectile;
 
@@ -69,7 +64,7 @@ export const updateProjectilesUpdate: EntityUpdateFunction<Components, Projectil
 	transform[TRANSFORM_ANGLE_INDEX] = computeAngle(newVelocityX, newVelocityY);
 };
 
-// Gather every possible target's position once per run, so a homing shot can look up whoever it is chasing.
+// Gather every target's position once per run, so a homing shot can look up its target.
 updateProjectilesUpdate.preRun = (world, entities, queries) => {
 	const scratch = world as Scratch;
 	const positionByEid: Record<number, TargetPosition> = {};

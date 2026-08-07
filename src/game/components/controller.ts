@@ -1,10 +1,8 @@
 import type { ComponentDefinition } from '@daneren2005/shared-memory-ecs';
 
-// controller: a faction/station.  `color` identifies the faction and `player` flags the one faction the
-// human controls.  What the station builds - which ship types, at what rate and level, and how many upgrades the
-// player has bought of each - lives on the separate `hangar` component; the controller is only the faction
-// identity and its economy.  `money` is a kill-reward currency - credited to whichever faction's ship gets a
-// kill, but only ever spent by the player - used to unlock and upgrade ship types.
+// controller: a faction/station's identity and economy. `color` identifies the faction, `player` flags the
+// human's. What it builds lives on the separate `hangar`. `money` is kill-reward currency, credited to whoever's
+// ship gets a kill but only ever spent by the player.
 
 // Block layout (Int32Array, size 3).
 export const CONTROLLER_COLOR = 0;

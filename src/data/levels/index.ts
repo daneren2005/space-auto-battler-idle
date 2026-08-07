@@ -16,12 +16,11 @@ import { level14 } from './level-14';
 import { level15 } from './level-15';
 import { level16 } from './level-16';
 
-// Every level, in play order.  Add new levels here (one file each) and chain them with `nextLevel`.  The campaign
-// is grouped into four acts of rising difficulty (see each act's opening file for its design intent):
-//   Act I  - Skirmish  (1-4):  Skiffs only, rising rate/level; the player learns rate vs. level and unlocks the Gunner.
-//   Act II - Escalation (5-9): Gunners, then evasive Wasp swarms and a first shielded Bulwark; a second station; map grows.
-//   Act III- Fortress  (10-14): tanks (Bulwark) and snipers (Railgun) at steep levels; a third front opens.
-//   Act IV - Onslaught (15-16): Carriers and full combined-arms fleets on the largest maps; 16 is the prestige wall.
+// Every level, in play order; chain new ones with `nextLevel`. Four acts of rising difficulty:
+//   Act I  - Skirmish  (1-4):  Skiffs only, rising rate/level; unlocks the Gunner.
+//   Act II - Escalation (5-9): Gunners, Wasp swarms, a first Bulwark; a second station; map grows.
+//   Act III- Fortress  (10-14): tanks (Bulwark) and snipers (Railgun) at steep levels; a third front.
+//   Act IV - Onslaught (15-16): Carriers and combined-arms fleets on the largest maps; 16 is the prestige wall.
 export const levels: Array<LevelConfig> = [
 	level1,
 	level2,

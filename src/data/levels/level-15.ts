@@ -4,11 +4,8 @@ import { PLAYER_COLOR, ENEMY_COLOR } from '@/data/colors';
 import { factionCollision } from '@/data/collide-categories';
 import { PLAYER_START_SHIPS } from './player-start';
 
-// Act IV - Onslaught (levels 15-16): the largest maps and the full weight of the roster fielded at high level, so
-// only a broad, well-levelled fleet stands a chance.  Level 15 introduces the Carrier - a slow flagship that keeps
-// launching drone sub-ships, so its front regenerates faster than the player can clear it unless the Carrier
-// itself is killed.  Three allied bases: a Carrier-and-Bulwark flagship wall, a Railgun-and-Stormcaller sniper
-// nest, and an armour-and-swarm battery.  This is the last level tuned to be winnable by a maxed un-prestiged run.
+// Act IV - Onslaught: the largest maps and the full roster at high level. Level 15 introduces the Carrier, whose
+// drone front regenerates unless it's killed. Three allied bases; the last level winnable by a maxed un-prestiged run.
 const WIDTH = 620;
 const HEIGHT = 1020;
 const MARGIN = 130;

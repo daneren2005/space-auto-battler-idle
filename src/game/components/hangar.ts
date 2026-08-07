@@ -1,29 +1,19 @@
 import type { ComponentDefinition } from '@daneren2005/shared-memory-ecs';
 import { SHIP_TYPES, SHIP_TYPE_INDEX, SHIP_TYPE_COUNT, type ShipType } from '@/data/ship-types';
 
-// hangar: a station's per-ship-type production state.  Where the controller holds the faction (colour, money,
-// player flag), the hangar holds what it is building - one independent production line per ship type, laid out
-// by SHIP_TYPE_INDEX so a fixed-size block can address any type by its stable index.  Five values per type:
+// hangar: a station's per-ship-type production state - one production line per type, laid out by SHIP_TYPE_INDEX.
+// Five values per type:
 //
-//   rate        - ships/second of this type (0 = the type is not built / locked).  Raised by the main thread when
-//                 the player buys a rate upgrade, so the spawn worker reads it atomically.
-//   level       - the upgrade level of this type (0 = locked, 1 = base).  It scales the shields and damage every
-//                 ship of the type spawns with (see ship-types' shieldsForLevel / contactDamageForLevel).
-//   progress    - the fraction of the next ship of this type banked so far, carried between runs (microseconds of
-//                 elapsed time x rate).  Written only by the spawn worker, on one thread, so a plain read is safe.
-//   rateBought  - how many rate upgrades the player has bought for this type (0 for a station's level-config base).
-//                 It both prices the next rate upgrade (cost = base * growth ** rateBought) and is what carries
-//                 across levels; the rate itself is the config base plus this, so the two move together on a buy.
-//   levelBought - the same for level upgrades: how many the player has bought (level = config base + this).
+//   rate        - ships/second (0 = not built / locked). Read by the spawn worker, so mutated with Atomics.
+//   level       - upgrade level (0 = locked, 1 = base). Scales spawned shields/damage. Atomic like rate.
+//   progress    - fraction of the next ship banked. Written only by the spawn worker, so a plain read is safe.
+//   rateBought  - rate upgrades bought (prices the next, cost = base * growth ** rateBought; rate = config + this).
+//   levelBought - the same for level upgrades (level = config base + this).
 //
-// rateBought / levelBought are touched only by the main thread (the upgrade buttons), so plain reads/writes are
-// safe for them; rate / level are read by the spawn worker, so those two are mutated with Atomics on a purchase.
-//
-// A station's spawn state is not worth persisting through world serialization (progress is at most a fraction of
-// one ship, and the player's bought counts are carried by the separate Carry record), so this has no save().
+// rateBought / levelBought are touched only by the main thread, so plain reads/writes are safe.
+// No save(): spawn progress isn't worth persisting and bought counts ride the separate Carry record.
 
-// The block is five sections of SHIP_TYPE_COUNT each: all rates, then all levels, progress, rateBought, and
-// finally all levelBought values.
+// Five sections of SHIP_TYPE_COUNT: rates, levels, progress, rateBought, levelBought.
 export function hangarRateIndex(typeIndex: number): number {
 	return typeIndex;
 }
@@ -40,7 +30,6 @@ export function hangarLevelBoughtIndex(typeIndex: number): number {
 	return 4 * SHIP_TYPE_COUNT + typeIndex;
 }
 
-// How many sections of SHIP_TYPE_COUNT the block holds, so the size and every allocation stay in step.
 const HANGAR_SECTIONS = 5;
 
 export interface HangarShipConfig {
@@ -48,11 +37,9 @@ export interface HangarShipConfig {
 	level?: number
 }
 export interface HangarConfig {
-	// A station is the one entity built with a `color` (see controller), so it is what gates the hangar on: every
-	// station gets one, no ship or projectile does.  The value itself is unused here - the controller owns colour.
+	// A station is the one entity built with a `color`, so it gates the hangar on. Unused here - controller owns colour.
 	color?: number
-	// Which types this station builds, each at its own rate + level.  The only way to configure a station's
-	// production: a station with no `ships` (or every line at rate 0) builds nothing.
+	// Which types this station builds, each at its own rate + level. No `ships` (or all rate 0) builds nothing.
 	ships?: Partial<Record<ShipType, HangarShipConfig>>
 }
 export interface HangarComponent {
@@ -66,7 +53,7 @@ export interface HangarComponent {
 export const hangarDefinition: ComponentDefinition<HangarComponent, Int32Array, HangarConfig> = {
 	type: Int32Array,
 	size: HANGAR_SECTIONS * SHIP_TYPE_COUNT,
-	// Only a station carries a hangar, and a station is the one entity built with a `color` (see controller).
+	// Only a station carries a hangar, and a station is the one entity built with a `color`.
 	loadProperties: ['color'],
 	load(entity, memory, config) {
 		const values = Array.from({ length: HANGAR_SECTIONS * SHIP_TYPE_COUNT }, () => 0);
@@ -76,7 +63,7 @@ export const hangarDefinition: ComponentDefinition<HangarComponent, Int32Array, 
 				if(ship) {
 					const typeIndex = SHIP_TYPE_INDEX[type];
 					values[hangarRateIndex(typeIndex)] = ship.rate ?? 0;
-					// A built type defaults to level 1 (base) if no explicit level is given.
+					// A built type defaults to level 1 (base).
 					values[hangarLevelIndex(typeIndex)] = ship.level ?? (ship.rate ? 1 : 0);
 				}
 			}

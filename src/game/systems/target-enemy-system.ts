@@ -12,8 +12,7 @@ export function createTargetEnemySystem(world: BaseWorld<typeof registry>) {
 		updateFunction: targetEnemyUpdate,
 		getWorker: () => new TargetEnemyWorker(),
 		queries: {
-			// `body` only says which outline the transform describes, so the spatial index files a circular
-			// station under a circle rather than under the square it fits inside.
+			// `body` tells the spatial index a station's outline (circle vs square).
 			collidable: { required: ['transform', 'health'], optional: ['body', 'controller', 'controlled'] },
 			stations: { required: ['controller', 'transform'] },
 		},

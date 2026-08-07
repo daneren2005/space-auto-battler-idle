@@ -4,12 +4,9 @@ import { PLAYER_COLOR, ENEMY_COLOR } from '@/data/colors';
 import { factionCollision } from '@/data/collide-categories';
 import { PLAYER_START_SHIPS } from './player-start';
 
-// Act IV finale - the wall (see level-15.ts for the act).  Three allied bases on the biggest field, each a maxed
-// combined-arms fleet: a Carrier-and-Bulwark flagship that regenerates its own front, a Railgun-and-Stormcaller
-// sniper nest, and an armour-and-Gunner battery, all at the top of their level curves.  This is deliberately tuned
-// to be UNBEATABLE by an un-prestiged run: it is the intended stopping point, the pinch that motivates the
-// Singularity reset once Phase 6 lands.  It has no `nextLevel` - until prestige exists, winning it (which should
-// take prestige bonuses) just rolls the campaign back to a fresh run via the win dialog's "Play Again".
+// Act IV finale - the wall. Three maxed combined-arms bases on the biggest field, deliberately tuned to be
+// UNBEATABLE by an un-prestiged run: the intended stopping point that motivates the Singularity reset. No
+// `nextLevel` - until prestige exists, winning it just rolls back to a fresh run.
 const WIDTH = 660;
 const HEIGHT = 1080;
 const MARGIN = 140;

@@ -1,11 +1,8 @@
 import type { Config } from '@/game/components';
 import { DEFAULT_SEARCH_RANGE } from '@/game/components/attack';
 
-// A drone: the tiny sub-ship a Carrier's weapon launches instead of a projectile (see weapon-update).  It is a
-// full ship - it targets, steers and rams like a Wasp - but it is not a station-buildable `ShipType`, so it has
-// no catalog entry or level scaling; it always spawns at these fixed stats.  Fast, fragile and cheap to field in
-// numbers, it is the compounding board presence a Carrier trades its slow, expensive hull for.  Its `owner` and
-// the collide category + mask it inherits from the Carrier are supplied per spawn, along with a launch heading.
+// A drone: the sub-ship a Carrier launches instead of a projectile. A full ship (targets, steers, rams like a
+// Wasp) but not a buildable `ShipType`, so it has no level scaling and always spawns at these fixed stats.
 export const droneConfig: Config = {
 	type: 'drone',
 	width: 6, height: 4,

@@ -4,9 +4,7 @@ import GameComponentSystem from './game-component-system';
 import { weaponUpdate } from './weapon-update';
 import WeaponWorker from './weapon.worker?worker';
 
-// Fire each armed ship's weapon at its target.  Only ships with a weapon are processed; `attack` supplies the
-// target the targeting system chose, `controlled` the owner a shot's kills pay out to, and `body` the collide
-// category + mask a shot inherits so it hits the same enemies the ship does.
+// Fires each armed ship's weapon at its target.
 export function createWeaponSystem(world: BaseWorld<typeof registry>) {
 	return new GameComponentSystem(world, {
 		name: 'weaponSystem',
@@ -14,7 +12,6 @@ export function createWeaponSystem(world: BaseWorld<typeof registry>) {
 		updateFunction: weaponUpdate,
 		getWorker: () => new WeaponWorker(),
 		queries: {
-			// Every possible target's position, so a firing ship can aim at whoever it is targeting.
 			targets: { required: ['transform'] },
 		},
 	});

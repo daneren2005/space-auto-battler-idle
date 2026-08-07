@@ -4,10 +4,8 @@ import { PLAYER_COLOR, ENEMY_COLOR } from '@/data/colors';
 import { factionCollision } from '@/data/collide-categories';
 import { PLAYER_START_SHIPS } from './player-start';
 
-// Act II - Escalation (levels 5-9): the enemy stops being a pure Skiff rush and starts fielding armed types, a
-// second station, and a bigger map, so raw ramming no longer settles a level on its own.  Level 5 opens the act
-// gently: the Act-I Skiff wall, now backed by a pair of Gunners - the first enemy that kills at range, chipping
-// the player's fleet before it can close.  Field still the compact portrait of Act I; it grows from level 6 on.
+// Act II - Escalation: armed types, a second station, and a bigger map arrive. Level 5 opens gently: the Skiff
+// wall backed by a pair of Gunners, the first enemy that kills at range.
 const WIDTH = 360;
 const HEIGHT = 640;
 const MARGIN = 80;

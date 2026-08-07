@@ -5,10 +5,8 @@ import { makeShipConfig } from './ship';
 import { droneConfig } from './drone';
 import { projectileConfig } from './projectile';
 
-// Every entity template this game can build, keyed by type - passed straight to the EntityFactory constructor.
-// The station, the Carrier's drone and the projectile are one-off templates; every buildable ship type is stamped
-// out of its catalog entry by makeShipConfig, so the roster grows by adding a `ShipType` (data/ship-types.ts)
-// rather than a template file.
+// Every entity template, keyed by type, passed to the EntityFactory. Every buildable ship is stamped from its
+// def by makeShipConfig, so the roster grows by adding a `ShipType` rather than a template file.
 const shipConfigs = Object.fromEntries(
 	SHIP_TYPES.map(type => [type, makeShipConfig(type)]),
 ) as Record<ShipType, Config>;

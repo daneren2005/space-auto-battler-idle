@@ -3,7 +3,7 @@ import { loadProgress } from '@/data/progress';
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT } from '@/game/display';
 import startGame from '@/game/start-game';
 
-// The campaign entry point: resume at the saved level with the upgrades / money carried over from earlier levels.
+// Campaign entry point: resume at the saved level with carried upgrades / money.
 const progress = loadProgress();
 
 export const game = startGame({

@@ -4,16 +4,12 @@ import { PLAYER_COLOR, ENEMY_COLOR } from '@/data/colors';
 import { factionCollision } from '@/data/collide-categories';
 import { PLAYER_START_SHIPS } from './player-start';
 
-// Act I - Skirmish (levels 1-4): the enemy fields only Skiffs, rising in rate and level, so the player learns the
-// core loop - rate (more ships) vs. level (tougher ships) - against a single, legible threat before any new type
-// enters.  Same compact portrait field as levels 1-2 (see level-1.ts for how bounds map to the camera).
+// Act I - Skirmish: Skiffs only, rising in rate and level, teaching rate vs. level against a single threat.
 const WIDTH = 360;
 const HEIGHT = 640;
 const MARGIN = 80;
 
-// The enemy pushes rate ahead of level here: four Skiffs a second at level 3 (two shields apiece) is a steady
-// stream the player can no longer clear by rate alone with their starting one-a-second line - the first level
-// that really wants a rate upgrade or two, and the first taste of shielded ships surviving a single ram.
+// Enemy pushes rate ahead of level: four level-3 Skiffs a second, the first level that really wants a rate upgrade.
 export const level3: LevelConfig = {
 	name: 'level-3',
 	title: 'Probe',

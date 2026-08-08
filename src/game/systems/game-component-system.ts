@@ -20,10 +20,16 @@ export function readBounds(world: unknown): Bounds {
 	return (world as { bounds: Bounds }).bounds;
 }
 
+// Reads the world's deterministic RNG seed
+export function readSeed(world: unknown): number {
+	return (world as { seed: number }).seed;
+}
+
 // Base ComponentSystem for every game system; it only adds the world's `bounds` to the per-run data so update
-// functions can keep entities on screen.
-export default class GameComponentSystem<T extends EntityUpdateComponents<Components>> extends ComponentSystem<Components, T, CustomSystemWorld> {
-	addDataToWorld(world: CustomSystemWorld): void {
+// functions can keep entities on screen. Generic over the world so a system whose worker builds extra per-run
+// state (e.g. a seeded RNG merged in via updateFunction.init) can widen it beyond CustomSystemWorld.
+export default class GameComponentSystem<T extends EntityUpdateComponents<Components>, W extends CustomSystemWorld = CustomSystemWorld> extends ComponentSystem<Components, T, W> {
+	addDataToWorld(world: W): void {
 		world.bounds = readBounds(this.world);
 	}
 }

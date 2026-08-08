@@ -1,4 +1,5 @@
 import { BaseWorld, EntityFactory } from '@daneren2005/shared-memory-ecs';
+import Rand from 'rand-seed';
 import { registry } from '../components';
 import type { Components, Config } from '../components';
 import type { Bounds } from '../systems/game-component-system';
@@ -25,14 +26,19 @@ export interface Scene {
 export default class GameWorld extends BaseWorld<typeof registry> {
 	bounds: Bounds = { width: 0, height: 0 };
 
+	seed: number;
+	rand: Rand;
+
 	// Held by name because the scene draws off it: physics reports each run's movement on the system, not the
 	// entities. Lives for the world's lifetime, so safe to hand out.
 	physicsSystem: GamePhysicsSystem;
 
-	constructor() {
+	constructor(seed: number = Math.random()) {
 		super(registry, {
 			factory: new EntityFactory<Components, Config>(entityConfigs),
 		});
+		this.seed = seed;
+		this.rand = new Rand(String(seed));
 		// Systems live for the world's lifetime; load only clears their entity lists, then re-populates them by
 		// re-emitting entity-added, so setting them up once here is enough.
 		this.physicsSystem = this.initSystems();

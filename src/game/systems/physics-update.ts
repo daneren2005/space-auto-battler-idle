@@ -120,16 +120,37 @@ function bounceOffWalls(world: CustomSystemWorld, components: GamePhysicsCompone
 	const bounds = world.bounds;
 
 	let bounced = false;
-	if(transform[TRANSFORM_X_INDEX] < 0 || transform[TRANSFORM_X_INDEX] > bounds.width) {
-		velocity[VELOCITY_X_INDEX] = -velocity[VELOCITY_X_INDEX];
+	const x = transform[TRANSFORM_X_INDEX];
+	if(x < 0) {
+		transform[TRANSFORM_X_INDEX] = 0;
+		if(velocity[VELOCITY_X_INDEX] < 0) {
+			velocity[VELOCITY_X_INDEX] = -velocity[VELOCITY_X_INDEX];
+		}
 		bounced = true;
-	}
-	if(transform[TRANSFORM_Y_INDEX] < 0 || transform[TRANSFORM_Y_INDEX] > bounds.height) {
-		velocity[VELOCITY_Y_INDEX] = -velocity[VELOCITY_Y_INDEX];
+	} else if(x > bounds.width) {
+		transform[TRANSFORM_X_INDEX] = bounds.width;
+		if(velocity[VELOCITY_X_INDEX] > 0) {
+			velocity[VELOCITY_X_INDEX] = -velocity[VELOCITY_X_INDEX];
+		}
 		bounced = true;
 	}
 
-	if(bounced) {
+	const y = transform[TRANSFORM_Y_INDEX];
+	if(y < 0) {
+		transform[TRANSFORM_Y_INDEX] = 0;
+		if(velocity[VELOCITY_Y_INDEX] < 0) {
+			velocity[VELOCITY_Y_INDEX] = -velocity[VELOCITY_Y_INDEX];
+		}
+		bounced = true;
+	} else if(y > bounds.height) {
+		transform[TRANSFORM_Y_INDEX] = bounds.height;
+		if(velocity[VELOCITY_Y_INDEX] > 0) {
+			velocity[VELOCITY_Y_INDEX] = -velocity[VELOCITY_Y_INDEX];
+		}
+		bounced = true;
+	}
+
+	if(bounced && (velocity[VELOCITY_X_INDEX] !== 0 || velocity[VELOCITY_Y_INDEX] !== 0)) {
 		transform[TRANSFORM_ANGLE_INDEX] = computeAngle(velocity[VELOCITY_X_INDEX], velocity[VELOCITY_Y_INDEX]);
 	}
 }
@@ -143,31 +164,31 @@ function collide(
 	queries: EntityQueryComponents<Components>,
 	callbacks: ComponentSystemCallbacks<Components>,
 ) {
+	// A projectile (a sensor) and a detonator each resolve the whole collision one-sidedly. The library reports a
+	// pair once, for whichever moved first, so that side can arrive as either `self` or `other` - resolve by role,
+	// keyed on the special entity's own eid so it acts once per run without spending the ship's collision slot.
+	const projectile = self.components.projectile ? self : other.components.projectile ? other : undefined;
+	if(projectile) {
+		if(!collidedThisRun.has(projectile.entityId)) {
+			collidedThisRun.add(projectile.entityId);
+			projectileHit(projectile, projectile === self ? other : self, callbacks);
+		}
+		return;
+	}
+
+	const detonator = isDetonator(self) ? self : isDetonator(other) ? other : undefined;
+	if(detonator) {
+		if(!collidedThisRun.has(detonator.entityId)) {
+			collidedThisRun.add(detonator.entityId);
+			detonate(detonator, callbacks);
+		}
+		return;
+	}
+
 	if(collidedThisRun.has(self.entityId)) {
 		return;
 	}
-
-	// A projectile is a sensor: the hit is resolved only from the projectile's own side.
-	if(other.components.projectile) {
-		return;
-	}
-
 	collidedThisRun.add(self.entityId);
-
-	if(self.components.projectile) {
-		projectileHit(self, other, callbacks);
-		return;
-	}
-
-	// A detonator resolves the whole collision from its own side (blast + death).
-	if(isDetonator(self)) {
-		detonate(self, callbacks);
-		return;
-	}
-	// Other side of a detonation: leave it to the detonator's own call.
-	if(isDetonator(other)) {
-		return;
-	}
 
 	// Re-face along the heading the bounce is now sending it.
 	const velocity = self.components.velocity;
@@ -177,7 +198,7 @@ function collide(
 }
 
 // One-sided: deals damage, pays the owner on a kill, then is consumed. A target mid-cooldown shrugs it off.
-function projectileHit(self: MovingEntity<GamePhysicsComponents>, other: CollisionEntity<GamePhysicsComponents>, callbacks: ComponentSystemCallbacks<Components>) {
+function projectileHit(self: Combatant, other: Combatant, callbacks: ComponentSystemCallbacks<Components>) {
 	if(!canTakeDamage(other)) {
 		return;
 	}
@@ -197,7 +218,7 @@ function isDetonator(combatant: Combatant): boolean {
 }
 
 // Deals contact damage to every enemy within `blastRadius` of the contact point, then dies.
-function detonate(self: MovingEntity<GamePhysicsComponents>, callbacks: ComponentSystemCallbacks<Components>) {
+function detonate(self: Combatant, callbacks: ComponentSystemCallbacks<Components>) {
 	const combat = self.components.combat;
 	const body = self.components.body;
 	const transform = self.components.transform;
@@ -322,6 +343,12 @@ function takeDamage(combatant: Combatant, damage: number, callbacks: ComponentSy
 
 function kill(entityId: number, entity: Uint32Array | undefined, callbacks: ComponentSystemCallbacks<Components>) {
 	if(!entity) {
+		return;
+	}
+
+	// Idempotent per run: own collision, a blast, and a station fleet-wipe can all reach the same entity, but
+	// only the first should emit a death - a second event has no entity left to find on the main thread.
+	if(entity[DEAD_INDEX] === 1) {
 		return;
 	}
 

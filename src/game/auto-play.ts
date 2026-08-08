@@ -135,7 +135,12 @@ export interface AutoPlayOptions {
 	stepMs?: number
 	maxLevelMs?: number
 	maxDeathsPerLevel?: number
+	// Fixed by default so a report or test run replays identically; override for a randomized run.
+	seed?: number
 }
+
+// A constant so the greedy auto-player's RNG-driven bits (launch velocities, strafe offsets) are reproducible.
+export const DEFAULT_AUTO_PLAY_SEED = 1;
 
 export type AutoPlayEndReason = 'campaign-cleared' | 'deaths-exceeded' | 'stalled' | 'no-player';
 
@@ -159,7 +164,7 @@ export async function* autoPlay(options: AutoPlayOptions = {}): AsyncGenerator<A
 	// Index within this run's own level list, so a custom campaign progresses through itself.
 	const indexOf = (name: string) => levels.findIndex(level => level.name === name);
 
-	const world = new GameWorld();
+	const world = new GameWorld(options.seed ?? DEFAULT_AUTO_PLAY_SEED);
 
 	// The last state the player station was seen in, captured the instant it dies so a loss can report it.
 	let playerEid = -1;

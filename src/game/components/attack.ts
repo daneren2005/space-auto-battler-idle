@@ -1,4 +1,5 @@
 import type { ComponentDefinition } from '@daneren2005/shared-memory-ecs';
+import type Rand from 'rand-seed';
 
 // attack: the eid a ship steers toward (0 = none) plus how it flies while chasing - steer force and top speed.
 // `speed` lives here, not on the physics velocity component, since the top speed a ship steers back to is this
@@ -51,15 +52,17 @@ export const attackDefinition: ComponentDefinition<AttackComponent, Float32Array
 	loadProperties: ['attacks'],
 	load(entity, memory, config) {
 		const strafe = config.strafe ? 1 : 0;
+		// The world's seeded RNG (entities load on the main thread) so a fixed-seed run rolls these identically.
+		const rand = (entity.world as unknown as { rand: Rand }).rand;
 		const index = memory.create([
 			0,
-			rollSteerForce(config.steerForce, config.steerForceBonus),
+			rollSteerForce(config.steerForce, config.steerForceBonus, rand),
 			config.speed,
 			config.searchRange ?? DEFAULT_SEARCH_RANGE,
 			config.standoffRange ?? 0,
 			strafe,
 			// Seed a random side + leg offset so a batch of strafers weaves out of phase, not in lockstep.
-			strafe ? (Math.random() < 0.5 ? -1 : 1) * Math.random() * STRAFE_LEG_SECONDS : 0,
+			strafe ? (rand.next() < 0.5 ? -1 : 1) * rand.next() * STRAFE_LEG_SECONDS : 0,
 		]);
 		const block = memory.getBlock(index);
 
@@ -112,10 +115,10 @@ export const attackDefinition: ComponentDefinition<AttackComponent, Float32Array
 };
 
 // A roll in [steerForce, steerForce * (1 + bonus)]. Omitting `bonus` makes every unit identical.
-function rollSteerForce(steerForce: number, bonus: number | undefined): number {
+function rollSteerForce(steerForce: number, bonus: number | undefined, rand: Rand): number {
 	if(!bonus) {
 		return steerForce;
 	}
 
-	return steerForce * (1 + Math.random() * bonus);
+	return steerForce * (1 + rand.next() * bonus);
 }

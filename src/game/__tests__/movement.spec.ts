@@ -74,6 +74,28 @@ describe('armed ship standoff', () => {
 	});
 });
 
+describe('level bounds', () => {
+	it('keeps a ship inside the level and turns it back in when it runs into a wall', async () => {
+		world = await loadTwoStations();
+		const redStation = entityList(world)[0];
+
+		// A lone ship hard against the right wall, shoved straight at it
+		const ship = world.loadEntity({ type: 'gunner', x: 595, y: 300, owner: redStation.eid, ...RED_FACTION });
+		ship.components.velocity!.velocityX = 200;
+		ship.components.velocity!.velocityY = 0;
+
+		for(let i = 0; i < 10; i++) {
+			world.update(50);
+		}
+
+		// It never escaped the 600x600 bounds and is now heading back inward.
+		const transform = ship.components.transform!;
+		expect(transform.x).toBeGreaterThanOrEqual(0);
+		expect(transform.x).toBeLessThanOrEqual(600);
+		expect(ship.components.velocity!.velocityX).toBeLessThan(0);
+	});
+});
+
 describe('missile frigate strafe', () => {
 	it('slides sideways across its target instead of freezing when in range', async () => {
 		world = await loadTwoStations();

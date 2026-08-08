@@ -49,6 +49,11 @@ interface Explosion {
 
 const EXPLOSION_DURATION = 150;
 
+// Short fade-to-background wipe that hides the world swap between levels. Fades to the scene background
+// colour so the letterboxing around the play area stays seamless.
+const TRANSITION_FADE_MS = 220;
+const TRANSITION_FADE_COLOR = { r: 0x05, g: 0x07, b: 0x0f };
+
 export interface StationShipStat {
 	eid: number
 	color: number
@@ -131,6 +136,9 @@ export default class GameScene extends Phaser.Scene {
 
 	// A decided match's level swap, deferred to the next update (see queueTransition).
 	private pendingTransition: (() => void) | null = null;
+
+	// True while the between-levels fade is running so the swap fires once, at the covered midpoint.
+	private transitioning = false;
 
 	// A loss frees the station before the match is settled, so this holds what the player died with.
 	private lastCarry: Carry = emptyCarry();
@@ -271,11 +279,12 @@ export default class GameScene extends Phaser.Scene {
 	}
 
 	update(time: number, delta: number) {
-		// A decided match's swap runs here so any in-flight worker run settles on the old world first.
-		if(this.pendingTransition) {
+		// A decided match kicks off the fade here so any in-flight worker run settles on the old world first;
+		// the swap itself fires once the screen is covered (see startTransition).
+		if(this.pendingTransition && !this.transitioning) {
 			const run = this.pendingTransition;
 			this.pendingTransition = null;
-			run();
+			this.startTransition(run);
 			return;
 		}
 
@@ -533,6 +542,25 @@ export default class GameScene extends Phaser.Scene {
 
 	private queueTransition(run: () => void): void {
 		this.pendingTransition = run;
+	}
+
+	// Fades the play area out, swaps the world once it is fully covered, then fades the new level back in.
+	// The swap runs at the covered midpoint, so the new level starts simulating immediately behind the fade
+	// rather than waiting for the animation to finish.
+	private startTransition(run: () => void): void {
+		this.transitioning = true;
+		const { r, g, b } = TRANSITION_FADE_COLOR;
+		this.cameras.main.fadeOut(TRANSITION_FADE_MS, r, g, b, (_camera: Phaser.Cameras.Scene2D.Camera, progress: number) => {
+			if(progress < 1) {
+				return;
+			}
+			run();
+			this.cameras.main.fadeIn(TRANSITION_FADE_MS, r, g, b, (_c: Phaser.Cameras.Scene2D.Camera, p: number) => {
+				if(p >= 1) {
+					this.transitioning = false;
+				}
+			});
+		});
 	}
 
 	// Live off the station on a win, else the snapshot taken when it was destroyed on a loss.

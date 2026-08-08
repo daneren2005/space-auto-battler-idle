@@ -252,13 +252,13 @@ export default class UIScene extends Phaser.Scene {
 			chip.rateText.setText(`+${roster.rate(type)}/s`);
 			// Brighter when either upgrade is affordable.
 			const canBuy = roster.canBuyRate(type) || roster.canBuyLevel(type);
-			chip.container.setAlpha(canBuy ? 1 : 0.8);
+			chip.container.setAlpha(canBuy ? 1 : 0.4);
 			visible.push(chip.container);
 		}
 
 		this.plusChip.setVisible(anyLocked);
 		if(anyLocked) {
-			this.plusChip.setAlpha(roster.money >= this.cheapestUnlockCost(roster) ? 1 : 0.8);
+			this.plusChip.setAlpha(roster.money >= this.cheapestUnlockCost(roster) ? 1 : 0.4);
 			visible.push(this.plusChip);
 		}
 

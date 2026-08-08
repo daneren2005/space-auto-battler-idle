@@ -5,6 +5,7 @@ import type { Components, ComponentArrays } from '../components';
 import computeAngle from '@/math/compute-angle';
 import { SHIP_TYPES, SHIP_TYPE_INDEX, SHIP_TYPE_DEFS, shieldsForLevel, contactDamageForLevel, weaponDamageForLevel, droneCountForLevel } from '@/data/ship-types';
 import { hangarRateIndex, hangarLevelIndex, hangarProgressIndex } from '../components/hangar';
+import { seedRand, type SeededWorld } from './seeded-world';
 
 // A freshly-spawned ship's random initial velocity magnitude, in pixels/second.
 const SHIP_SPEED = 100;
@@ -16,7 +17,7 @@ const PROGRESS_PER_SHIP = 1_000_000;
 // Each run a station banks `elapsed * rate` per production line and launches however many whole ships that buys,
 // carrying the fraction over so the average rate holds. Each ship is stamped with its type's level-scaled
 // shields/damage. Creation can't happen in a worker, so createEntityWorker buffers the config for next frame.
-export const spawnShipUpdate: EntityUpdateFunction<Components, Pick<ComponentArrays, 'hangar' | 'transform' | 'body'>> = (world, entityId, components, queries, callbacks) => {
+export const spawnShipUpdate: EntityUpdateFunction<Components, Pick<ComponentArrays, 'hangar' | 'transform' | 'body'>, SeededWorld> = (world, entityId, components, queries, callbacks) => {
 	const hangar = components.hangar;
 	const transform = components.transform;
 	const body = components.body;
@@ -58,8 +59,8 @@ export const spawnShipUpdate: EntityUpdateFunction<Components, Pick<ComponentArr
 
 		for(let i = 0; i < spawning; i++) {
 			// Rolled per ship, so a batch leaves as a spread rather than a convoy.
-			const velocityX = (Math.random() > 0.5 ? -1 : 1) * Math.random() * SHIP_SPEED;
-			const velocityY = (Math.random() > 0.5 ? -1 : 1) * Math.random() * SHIP_SPEED;
+			const velocityX = (world.rand.next() > 0.5 ? -1 : 1) * world.rand.next() * SHIP_SPEED;
+			const velocityY = (world.rand.next() > 0.5 ? -1 : 1) * world.rand.next() * SHIP_SPEED;
 
 			createEntityWorker({
 				type,
@@ -79,3 +80,6 @@ export const spawnShipUpdate: EntityUpdateFunction<Components, Pick<ComponentArr
 		}
 	}
 };
+
+// Seeds the worker's RNG once from the seed the spawn system sends in its init message.
+spawnShipUpdate.init = seedRand;

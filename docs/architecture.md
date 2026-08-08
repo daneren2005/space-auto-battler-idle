@@ -43,9 +43,14 @@ Most systems in [src/game/systems/](../src/game/systems/) are three files sharin
 
 | File | Role |
 | --- | --- |
-| `x-system.ts` | Creates the `ComponentSystem`: declares `required` components, extra `queries`, and `getWorker`. |
-| `x-update.ts` | The **pure update function** — runs identically on the main thread or in the worker. All the game logic lives here. |
+| `x-system.ts` | Creates the `ComponentSystem`: declares `required` components, extra `queries`, `getWorker`, and optional `getInitData`. |
+| `x-update.ts` | The **pure update function** — runs identically on the main thread or in the worker. All the game logic lives here. May attach `preRun` / `entityRemoved` / `init` to the function. |
 | `x.worker.ts` | The worker entry: `createComponentWorker(self, xUpdate)`. Thin. |
+
+A worker can be given one-time setup: the system's `getInitData()` builds a payload that rides the worker's init
+message, and `xUpdate.init(data)` (attached to the update function) runs once in the worker before it reports
+loaded. Whatever `init` returns is merged onto the per-run `world` every run — the way to hold state that must
+persist across runs inside the worker (see the seeded RNG under Determinism).
 
 To change what a system *does*, edit `x-update.ts`. To change *which* entities/data it sees, edit
 `x-system.ts`. All game systems extend `GameComponentSystem`
@@ -124,13 +129,20 @@ Tests live in `__tests__/` folders next to the code (`*.spec.ts`).
   config the factory stamps entities from. Every buildable ship is stamped by `makeShipConfig(type)`.
 - **Levels → Scenes.** A `LevelConfig` is `{ name, title, bounds, entities, nextLevel? }`. Loading it calls
   `world.load({ entities, bounds })`, which frees old entities and adds new ones **in place** — no page
-  reload; workers resync from the add/remove deltas (memory `in-place-level-reload`).
+  reload; workers resync from the add/remove deltas (memory `in-place-level-reload`). Between levels a short
+  camera fade (`GameScene.startTransition`) hides the swap: it fades the play area out, runs the swap once the
+  screen is covered so the new level starts simulating immediately, then fades back in.
 - **Carry / progress.** `Carry` = unspent money + per-type bought rate/level upgrades. A win advances +
   saves; a loss drops back a level; both carry forward what the player finished with. `progressAfterMatch`
   in [progress.ts](../src/data/progress.ts) is the single decision point.
 - **Ship roster.** `ShipRoster` is a testable view+mutator over a station's money/hangar blocks. Values the
   spawn worker also reads (money, rate, level) are written with **Atomics**. The GameScene owns the player's
   roster; the UIScene drives it.
+- **Determinism.** A run's randomness is seeded (`rand-seed`) so a fixed seed replays identically. `GameWorld` takes
+  a `seed` (random by default for normal play; auto-play passes `DEFAULT_AUTO_PLAY_SEED`). Main-thread code that
+  rolls randomness — the `attack` component's load — uses `world.rand`. Worker code can't share that RNG across the
+  thread boundary, so the `spawn-ship` system sends the seed via `getInitData` and its update's `init` hook builds a
+  worker-local `Rand` (reached as `world.rand` each run). Add new randomness through these, never `Math.random`.
 - **Display / camera.** Fixed canvas (`DISPLAY_WIDTH/HEIGHT`, portrait for campaign, wide for stress test).
   The game camera zooms to fit the level's bounds into the play-area strip; the HUD has its own full-canvas
   camera, so HUD size never changes with level size.

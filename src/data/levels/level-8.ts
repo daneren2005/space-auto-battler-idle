@@ -34,8 +34,8 @@ export const level8: LevelConfig = {
 			color: ENEMY_COLOR,
 			...factionCollision(1),
 			ships: {
-				skiff: { rate: 5, level: 4 },
-				wasp: { rate: 2, level: 2 },
+				skiff: { rate: 6, level: 5 },
+				wasp: { rate: 3, level: 3 },
 			},
 		} satisfies Config,
 		{
@@ -45,8 +45,8 @@ export const level8: LevelConfig = {
 			color: ENEMY_COLOR,
 			...factionCollision(1),
 			ships: {
-				skiff: { rate: 4, level: 4 },
-				gunner: { rate: 3, level: 3 },
+				skiff: { rate: 5, level: 5 },
+				gunner: { rate: 4, level: 4 },
 			},
 		} satisfies Config,
 	],

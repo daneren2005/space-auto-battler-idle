@@ -35,8 +35,9 @@ export const level16: LevelConfig = {
 			color: ENEMY_COLOR,
 			...factionCollision(1),
 			ships: {
-				carrier: { rate: 1, level: 4 },
-				bulwark: { rate: 2, level: 5 },
+				skiff: { rate: 8, level: 6 },
+				bulwark: { rate: 3, level: 6 },
+				carrier: { rate: 1, level: 5 },
 			},
 		} satisfies Config,
 		{
@@ -46,8 +47,9 @@ export const level16: LevelConfig = {
 			color: ENEMY_COLOR,
 			...factionCollision(1),
 			ships: {
-				railgunLancer: { rate: 2, level: 5 },
-				stormcaller: { rate: 2, level: 4 },
+				gunner: { rate: 7, level: 6 },
+				railgunLancer: { rate: 3, level: 5 },
+				stormcaller: { rate: 2, level: 5 },
 			},
 		} satisfies Config,
 		{
@@ -57,8 +59,9 @@ export const level16: LevelConfig = {
 			color: ENEMY_COLOR,
 			...factionCollision(1),
 			ships: {
-				bulwark: { rate: 3, level: 5 },
-				gunner: { rate: 5, level: 5 },
+				skiff: { rate: 8, level: 6 },
+				bulwark: { rate: 3, level: 6 },
+				detonator: { rate: 3, level: 3 },
 			},
 		} satisfies Config,
 	],

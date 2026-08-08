@@ -32,8 +32,10 @@ export const level10: LevelConfig = {
 			color: ENEMY_COLOR,
 			...factionCollision(1),
 			ships: {
-				bulwark: { rate: 2, level: 4 },
-				gunner: { rate: 3, level: 4 },
+				skiff: { rate: 7, level: 6 },
+				gunner: { rate: 5, level: 5 },
+				bulwark: { rate: 2, level: 5 },
+				detonator: { rate: 2, level: 2 },
 			},
 		} satisfies Config,
 	],

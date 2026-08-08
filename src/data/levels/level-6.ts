@@ -4,7 +4,8 @@ import { PLAYER_COLOR, ENEMY_COLOR } from '@/data/colors';
 import { factionCollision } from '@/data/collide-categories';
 import { PLAYER_START_SHIPS } from './player-start';
 
-// Act II: the map takes its first step up and the Gunner escort thickens to three at level 3.
+// Act II: the map takes its first step up; a Skiff line with a small Gunner escort. Kept clearly winnable on a
+// lean fleet because it's the grind-back level for the level-7 wall - a loss on 7 drops the player here to farm.
 const WIDTH = 400;
 const HEIGHT = 700;
 const MARGIN = 90;
@@ -31,8 +32,8 @@ export const level6: LevelConfig = {
 			color: ENEMY_COLOR,
 			...factionCollision(1),
 			ships: {
-				skiff: { rate: 5, level: 5 },
-				gunner: { rate: 3, level: 3 },
+				skiff: { rate: 5, level: 4 },
+				gunner: { rate: 2, level: 3 },
 			},
 		} satisfies Config,
 	],

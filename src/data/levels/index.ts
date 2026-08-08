@@ -18,9 +18,13 @@ import { level16 } from './level-16';
 
 // Every level, in play order; chain new ones with `nextLevel`. Four acts of rising difficulty:
 //   Act I  - Skirmish  (1-4):  Skiffs only, rising rate/level; unlocks the Gunner.
-//   Act II - Escalation (5-9): Gunners, Wasp swarms, a first Bulwark; a second station; map grows.
-//   Act III- Fortress  (10-14): tanks (Bulwark) and snipers (Railgun) at steep levels; a third front.
+//   Act II - Escalation (5-9): Gunners and Wasp swarms; level 7 is the first wall (a kamikaze Detonator stream a
+//                              lean fleet can't soak), so dying-and-grinding starts here; a second station; map grows.
+//   Act III- Fortress  (10-14): tanks (Bulwark) and snipers (Railgun) at steep levels, each fronted by a Detonator
+//                              breaker so fights stay decisive; a third front. Level 14 is a hard wall.
 //   Act IV - Onslaught (15-16): Carriers and combined-arms fleets on the largest maps; 16 is the prestige wall.
+// From level 7 on, most levels are tuned so a lean fleet loses on arrival and must grind the prior level first
+// (progressAfterMatch drops back a level on a loss); the enemy fleet cost never decreases (see campaign.spec).
 export const levels: Array<LevelConfig> = [
 	level1,
 	level2,

@@ -62,10 +62,10 @@ Payback: 26.3s of clearing this station's spawns to earn back its $105 fleet cos
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Skiff | 5 | 4 | $0 | $150 | $35 | $185 | 5 |
-| **Total** | | | | | | **$185** | **5** |
+| Skiff | 6 | 4 | $0 | $310 | $35 | $345 | 6 |
+| **Total** | | | | | | **$345** | **6** |
 
-Payback: 37.0s of clearing this station's spawns to earn back its $185 fleet cost.
+Payback: 57.5s of clearing this station's spawns to earn back its $345 fleet cost.
 
 ## level-5 - Escort
 
@@ -91,11 +91,11 @@ Payback: 38.3s of clearing this station's spawns to earn back its $345 fleet cos
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Skiff | 5 | 5 | $0 | $150 | $75 | $225 | 5 |
-| Gunner | 3 | 3 | $40 | $240 | $120 | $400 | 6 |
-| **Total** | | | | | | **$625** | **11** |
+| Skiff | 5 | 4 | $0 | $150 | $35 | $185 | 5 |
+| Gunner | 2 | 3 | $40 | $80 | $120 | $240 | 4 |
+| **Total** | | | | | | **$425** | **9** |
 
-Payback: 56.8s of clearing this station's spawns to earn back its $625 fleet cost.
+Payback: 47.2s of clearing this station's spawns to earn back its $425 fleet cost.
 
 ## level-7 - Bastion
 
@@ -106,12 +106,12 @@ Payback: 56.8s of clearing this station's spawns to earn back its $625 fleet cos
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Skiff | 4 | 5 | $0 | $70 | $75 | $145 | 4 |
-| Gunner | 3 | 3 | $40 | $240 | $120 | $400 | 6 |
-| Bulwark | 1 | 2 | $220 | $0 | $220 | $440 | 5 |
-| **Total** | | | | | | **$985** | **15** |
+| Skiff | 6 | 5 | $0 | $310 | $75 | $385 | 6 |
+| Gunner | 3 | 4 | $40 | $240 | $280 | $560 | 6 |
+| Detonator | 2 | 2 | $220 | $440 | $220 | $880 | 8 |
+| **Total** | | | | | | **$1,825** | **20** |
 
-Payback: 65.7s of clearing this station's spawns to earn back its $985 fleet cost.
+Payback: 91.3s of clearing this station's spawns to earn back its $1,825 fleet cost.
 
 ## level-8 - Pincer
 
@@ -122,26 +122,26 @@ Payback: 65.7s of clearing this station's spawns to earn back its $985 fleet cos
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Skiff | 5 | 4 | $0 | $150 | $35 | $185 | 5 |
-| Wasp Interceptor | 2 | 2 | $90 | $180 | $90 | $360 | 4 |
-| **Total** | | | | | | **$545** | **9** |
+| Skiff | 6 | 5 | $0 | $310 | $75 | $385 | 6 |
+| Wasp Interceptor | 3 | 3 | $120 | $720 | $360 | $1,200 | 6 |
+| **Total** | | | | | | **$1,585** | **12** |
 
-Payback: 60.6s of clearing this station's spawns to earn back its $545 fleet cost.
+Payback: 132.1s of clearing this station's spawns to earn back its $1,585 fleet cost.
 
 ### Opponent #2 (color #d50000)
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Skiff | 4 | 4 | $0 | $70 | $35 | $105 | 4 |
-| Gunner | 3 | 3 | $40 | $240 | $120 | $400 | 6 |
-| **Total** | | | | | | **$505** | **10** |
+| Skiff | 5 | 5 | $0 | $150 | $75 | $225 | 5 |
+| Gunner | 4 | 4 | $40 | $560 | $280 | $880 | 8 |
+| **Total** | | | | | | **$1,105** | **13** |
 
-Payback: 50.5s of clearing this station's spawns to earn back its $505 fleet cost.
+Payback: 85.0s of clearing this station's spawns to earn back its $1,105 fleet cost.
 
 ### Level total
 
-- Fleet cost (all opponents): **$1,050**
-- Income: **19/s**
+- Fleet cost (all opponents): **$2,690**
+- Income: **25/s**
 
 ## level-9 - Onset
 
@@ -152,26 +152,28 @@ Payback: 50.5s of clearing this station's spawns to earn back its $505 fleet cos
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Skiff | 5 | 5 | $0 | $150 | $75 | $225 | 5 |
-| Wasp Interceptor | 3 | 3 | $90 | $540 | $270 | $900 | 6 |
-| **Total** | | | | | | **$1,125** | **11** |
+| Skiff | 6 | 6 | $0 | $310 | $155 | $465 | 6 |
+| Detonator | 1 | 2 | $220 | $0 | $220 | $440 | 4 |
+| Wasp Interceptor | 4 | 4 | $120 | $1,680 | $840 | $2,640 | 8 |
+| **Total** | | | | | | **$3,545** | **18** |
 
-Payback: 102.3s of clearing this station's spawns to earn back its $1,125 fleet cost.
+Payback: 196.9s of clearing this station's spawns to earn back its $3,545 fleet cost.
 
 ### Opponent #2 (color #d50000)
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Skiff | 4 | 4 | $0 | $70 | $35 | $105 | 4 |
-| Gunner | 3 | 4 | $40 | $240 | $280 | $560 | 6 |
-| **Total** | | | | | | **$665** | **10** |
+| Skiff | 6 | 5 | $0 | $310 | $75 | $385 | 6 |
+| Gunner | 5 | 5 | $40 | $1,200 | $600 | $1,840 | 10 |
+| Detonator | 1 | 2 | $220 | $0 | $220 | $440 | 4 |
+| **Total** | | | | | | **$2,665** | **20** |
 
-Payback: 66.5s of clearing this station's spawns to earn back its $665 fleet cost.
+Payback: 133.3s of clearing this station's spawns to earn back its $2,665 fleet cost.
 
 ### Level total
 
-- Fleet cost (all opponents): **$1,790**
-- Income: **21/s**
+- Fleet cost (all opponents): **$6,210**
+- Income: **38/s**
 
 ## level-10 - Rampart
 
@@ -182,11 +184,13 @@ Payback: 66.5s of clearing this station's spawns to earn back its $665 fleet cos
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Gunner | 3 | 4 | $40 | $240 | $280 | $560 | 6 |
-| Bulwark | 2 | 4 | $220 | $440 | $1,540 | $2,200 | 10 |
-| **Total** | | | | | | **$2,760** | **16** |
+| Skiff | 7 | 6 | $0 | $630 | $155 | $785 | 7 |
+| Gunner | 5 | 5 | $40 | $1,200 | $600 | $1,840 | 10 |
+| Detonator | 2 | 2 | $220 | $440 | $220 | $880 | 8 |
+| Bulwark | 2 | 5 | $300 | $600 | $4,500 | $5,400 | 10 |
+| **Total** | | | | | | **$8,905** | **35** |
 
-Payback: 172.5s of clearing this station's spawns to earn back its $2,760 fleet cost.
+Payback: 254.4s of clearing this station's spawns to earn back its $8,905 fleet cost.
 
 ## level-11 - Siege
 
@@ -197,26 +201,28 @@ Payback: 172.5s of clearing this station's spawns to earn back its $2,760 fleet 
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Skiff | 5 | 5 | $0 | $150 | $75 | $225 | 5 |
-| Bulwark | 1 | 4 | $220 | $0 | $1,540 | $1,760 | 5 |
-| **Total** | | | | | | **$1,985** | **10** |
+| Skiff | 7 | 6 | $0 | $630 | $155 | $785 | 7 |
+| Detonator | 1 | 2 | $220 | $0 | $220 | $440 | 4 |
+| Bulwark | 2 | 5 | $300 | $600 | $4,500 | $5,400 | 10 |
+| **Total** | | | | | | **$6,625** | **21** |
 
-Payback: 198.5s of clearing this station's spawns to earn back its $1,985 fleet cost.
+Payback: 315.5s of clearing this station's spawns to earn back its $6,625 fleet cost.
 
 ### Opponent #2 (color #d50000)
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Gunner | 3 | 4 | $40 | $240 | $280 | $560 | 6 |
-| Railgun Lancer | 1 | 3 | $200 | $0 | $600 | $800 | 4 |
-| **Total** | | | | | | **$1,360** | **10** |
+| Gunner | 5 | 5 | $40 | $1,200 | $600 | $1,840 | 10 |
+| Railgun Lancer | 2 | 4 | $280 | $560 | $1,960 | $2,800 | 8 |
+| Detonator | 1 | 2 | $220 | $0 | $220 | $440 | 4 |
+| **Total** | | | | | | **$5,080** | **22** |
 
-Payback: 136.0s of clearing this station's spawns to earn back its $1,360 fleet cost.
+Payback: 230.9s of clearing this station's spawns to earn back its $5,080 fleet cost.
 
 ### Level total
 
-- Fleet cost (all opponents): **$3,345**
-- Income: **20/s**
+- Fleet cost (all opponents): **$11,705**
+- Income: **43/s**
 
 ## level-12 - Redoubt
 
@@ -227,26 +233,28 @@ Payback: 136.0s of clearing this station's spawns to earn back its $1,360 fleet 
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Bulwark | 2 | 4 | $220 | $440 | $1,540 | $2,200 | 10 |
-| Wasp Interceptor | 3 | 3 | $90 | $540 | $270 | $900 | 6 |
-| **Total** | | | | | | **$3,100** | **16** |
+| Skiff | 7 | 6 | $0 | $630 | $155 | $785 | 7 |
+| Detonator | 2 | 2 | $220 | $440 | $220 | $880 | 8 |
+| Bulwark | 2 | 5 | $300 | $600 | $4,500 | $5,400 | 10 |
+| **Total** | | | | | | **$7,065** | **25** |
 
-Payback: 193.8s of clearing this station's spawns to earn back its $3,100 fleet cost.
+Payback: 282.6s of clearing this station's spawns to earn back its $7,065 fleet cost.
 
 ### Opponent #2 (color #d50000)
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Railgun Lancer | 1 | 4 | $200 | $0 | $1,400 | $1,600 | 4 |
-| Scatter Gun | 2 | 3 | $140 | $280 | $420 | $840 | 6 |
-| **Total** | | | | | | **$2,440** | **10** |
+| Gunner | 6 | 6 | $40 | $2,480 | $1,240 | $3,760 | 12 |
+| Railgun Lancer | 2 | 4 | $280 | $560 | $1,960 | $2,800 | 8 |
+| Scatter Gun | 3 | 3 | $190 | $1,140 | $570 | $1,900 | 9 |
+| **Total** | | | | | | **$8,460** | **29** |
 
-Payback: 244.0s of clearing this station's spawns to earn back its $2,440 fleet cost.
+Payback: 291.7s of clearing this station's spawns to earn back its $8,460 fleet cost.
 
 ### Level total
 
-- Fleet cost (all opponents): **$5,540**
-- Income: **26/s**
+- Fleet cost (all opponents): **$15,525**
+- Income: **54/s**
 
 ## level-13 - Deadlock
 
@@ -257,26 +265,28 @@ Payback: 244.0s of clearing this station's spawns to earn back its $2,440 fleet 
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Railgun Lancer | 1 | 3 | $200 | $0 | $600 | $800 | 4 |
-| Bulwark | 2 | 5 | $220 | $440 | $3,300 | $3,960 | 10 |
-| **Total** | | | | | | **$4,760** | **14** |
+| Skiff | 7 | 6 | $0 | $630 | $155 | $785 | 7 |
+| Detonator | 2 | 3 | $220 | $440 | $660 | $1,320 | 8 |
+| Bulwark | 3 | 5 | $300 | $1,800 | $4,500 | $6,600 | 15 |
+| **Total** | | | | | | **$8,705** | **30** |
 
-Payback: 340.0s of clearing this station's spawns to earn back its $4,760 fleet cost.
+Payback: 290.2s of clearing this station's spawns to earn back its $8,705 fleet cost.
 
 ### Opponent #2 (color #d50000)
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Gunner | 4 | 5 | $40 | $560 | $600 | $1,200 | 8 |
-| Stormcaller | 1 | 3 | $260 | $0 | $780 | $1,040 | 5 |
-| **Total** | | | | | | **$2,240** | **13** |
+| Gunner | 6 | 6 | $40 | $2,480 | $1,240 | $3,760 | 12 |
+| Railgun Lancer | 2 | 4 | $280 | $560 | $1,960 | $2,800 | 8 |
+| Stormcaller | 2 | 4 | $360 | $720 | $2,520 | $3,600 | 10 |
+| **Total** | | | | | | **$10,160** | **30** |
 
-Payback: 172.3s of clearing this station's spawns to earn back its $2,240 fleet cost.
+Payback: 338.7s of clearing this station's spawns to earn back its $10,160 fleet cost.
 
 ### Level total
 
-- Fleet cost (all opponents): **$7,000**
-- Income: **27/s**
+- Fleet cost (all opponents): **$18,865**
+- Income: **60/s**
 
 ## level-14 - Overrun
 
@@ -287,34 +297,38 @@ Payback: 172.3s of clearing this station's spawns to earn back its $2,240 fleet 
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Bulwark | 2 | 5 | $220 | $440 | $3,300 | $3,960 | 10 |
-| **Total** | | | | | | **$3,960** | **10** |
+| Skiff | 7 | 6 | $0 | $630 | $155 | $785 | 7 |
+| Detonator | 2 | 3 | $220 | $440 | $660 | $1,320 | 8 |
+| Bulwark | 2 | 5 | $300 | $600 | $4,500 | $5,400 | 10 |
+| **Total** | | | | | | **$7,505** | **25** |
 
-Payback: 396.0s of clearing this station's spawns to earn back its $3,960 fleet cost.
+Payback: 300.2s of clearing this station's spawns to earn back its $7,505 fleet cost.
 
 ### Opponent #2 (color #d50000)
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Railgun Lancer | 2 | 4 | $200 | $400 | $1,400 | $2,000 | 8 |
-| **Total** | | | | | | **$2,000** | **8** |
+| Gunner | 5 | 6 | $40 | $1,200 | $1,240 | $2,480 | 10 |
+| Railgun Lancer | 2 | 5 | $280 | $560 | $4,200 | $5,040 | 8 |
+| **Total** | | | | | | **$7,520** | **18** |
 
-Payback: 250.0s of clearing this station's spawns to earn back its $2,000 fleet cost.
+Payback: 417.8s of clearing this station's spawns to earn back its $7,520 fleet cost.
 
 ### Opponent #3 (color #d50000)
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Gunner | 4 | 4 | $40 | $560 | $280 | $880 | 8 |
-| Scatter Gun | 2 | 3 | $140 | $280 | $420 | $840 | 6 |
-| **Total** | | | | | | **$1,720** | **14** |
+| Gunner | 6 | 6 | $40 | $2,480 | $1,240 | $3,760 | 12 |
+| Detonator | 2 | 3 | $220 | $440 | $660 | $1,320 | 8 |
+| Scatter Gun | 3 | 3 | $190 | $1,140 | $570 | $1,900 | 9 |
+| **Total** | | | | | | **$6,980** | **29** |
 
-Payback: 122.9s of clearing this station's spawns to earn back its $1,720 fleet cost.
+Payback: 240.7s of clearing this station's spawns to earn back its $6,980 fleet cost.
 
 ### Level total
 
-- Fleet cost (all opponents): **$7,680**
-- Income: **32/s**
+- Fleet cost (all opponents): **$22,005**
+- Income: **72/s**
 
 ## level-15 - Armada
 
@@ -325,36 +339,39 @@ Payback: 122.9s of clearing this station's spawns to earn back its $1,720 fleet 
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Bulwark | 1 | 4 | $220 | $0 | $1,540 | $1,760 | 5 |
-| Carrier | 1 | 3 | $400 | $0 | $1,200 | $1,600 | 8 |
-| **Total** | | | | | | **$3,360** | **13** |
+| Skiff | 7 | 6 | $0 | $630 | $155 | $785 | 7 |
+| Bulwark | 3 | 5 | $300 | $1,800 | $4,500 | $6,600 | 15 |
+| Carrier | 1 | 4 | $550 | $0 | $3,850 | $4,400 | 8 |
+| **Total** | | | | | | **$11,785** | **30** |
 
-Payback: 258.5s of clearing this station's spawns to earn back its $3,360 fleet cost.
+Payback: 392.8s of clearing this station's spawns to earn back its $11,785 fleet cost.
 
 ### Opponent #2 (color #d50000)
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Railgun Lancer | 2 | 4 | $200 | $400 | $1,400 | $2,000 | 8 |
-| Stormcaller | 1 | 3 | $260 | $0 | $780 | $1,040 | 5 |
-| **Total** | | | | | | **$3,040** | **13** |
+| Gunner | 6 | 6 | $40 | $2,480 | $1,240 | $3,760 | 12 |
+| Railgun Lancer | 2 | 5 | $280 | $560 | $4,200 | $5,040 | 8 |
+| Stormcaller | 2 | 4 | $360 | $720 | $2,520 | $3,600 | 10 |
+| **Total** | | | | | | **$12,400** | **30** |
 
-Payback: 233.8s of clearing this station's spawns to earn back its $3,040 fleet cost.
+Payback: 413.3s of clearing this station's spawns to earn back its $12,400 fleet cost.
 
 ### Opponent #3 (color #d50000)
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Bulwark | 2 | 4 | $220 | $440 | $1,540 | $2,200 | 10 |
-| Wasp Interceptor | 4 | 3 | $90 | $1,260 | $270 | $1,620 | 8 |
-| **Total** | | | | | | **$3,820** | **18** |
+| Skiff | 7 | 6 | $0 | $630 | $155 | $785 | 7 |
+| Detonator | 2 | 3 | $220 | $440 | $660 | $1,320 | 8 |
+| Bulwark | 3 | 5 | $300 | $1,800 | $4,500 | $6,600 | 15 |
+| **Total** | | | | | | **$8,705** | **30** |
 
-Payback: 212.2s of clearing this station's spawns to earn back its $3,820 fleet cost.
+Payback: 290.2s of clearing this station's spawns to earn back its $8,705 fleet cost.
 
 ### Level total
 
-- Fleet cost (all opponents): **$10,220**
-- Income: **44/s**
+- Fleet cost (all opponents): **$32,890**
+- Income: **90/s**
 
 ## level-16 - Event Horizon
 
@@ -364,33 +381,36 @@ Payback: 212.2s of clearing this station's spawns to earn back its $3,820 fleet 
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Bulwark | 2 | 5 | $220 | $440 | $3,300 | $3,960 | 10 |
-| Carrier | 1 | 4 | $400 | $0 | $2,800 | $3,200 | 8 |
-| **Total** | | | | | | **$7,160** | **18** |
+| Skiff | 8 | 6 | $0 | $1,270 | $155 | $1,425 | 8 |
+| Bulwark | 3 | 6 | $300 | $1,800 | $9,300 | $11,400 | 15 |
+| Carrier | 1 | 5 | $550 | $0 | $8,250 | $8,800 | 8 |
+| **Total** | | | | | | **$21,625** | **31** |
 
-Payback: 397.8s of clearing this station's spawns to earn back its $7,160 fleet cost.
+Payback: 697.6s of clearing this station's spawns to earn back its $21,625 fleet cost.
 
 ### Opponent #2 (color #d50000)
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Railgun Lancer | 2 | 5 | $200 | $400 | $3,000 | $3,600 | 8 |
-| Stormcaller | 2 | 4 | $260 | $520 | $1,820 | $2,600 | 10 |
-| **Total** | | | | | | **$6,200** | **18** |
+| Gunner | 7 | 6 | $40 | $5,040 | $1,240 | $6,320 | 14 |
+| Railgun Lancer | 3 | 5 | $280 | $1,680 | $4,200 | $6,160 | 12 |
+| Stormcaller | 2 | 5 | $360 | $720 | $5,400 | $6,480 | 10 |
+| **Total** | | | | | | **$18,960** | **36** |
 
-Payback: 344.4s of clearing this station's spawns to earn back its $6,200 fleet cost.
+Payback: 526.7s of clearing this station's spawns to earn back its $18,960 fleet cost.
 
 ### Opponent #3 (color #d50000)
 
 | Ship | Rate/s | Level | Unlock | Rate ups | Level ups | Fleet cost | Income/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Gunner | 5 | 5 | $40 | $1,200 | $600 | $1,840 | 10 |
-| Bulwark | 3 | 5 | $220 | $1,320 | $3,300 | $4,840 | 15 |
-| **Total** | | | | | | **$6,680** | **25** |
+| Skiff | 8 | 6 | $0 | $1,270 | $155 | $1,425 | 8 |
+| Detonator | 3 | 3 | $220 | $1,320 | $660 | $2,200 | 12 |
+| Bulwark | 3 | 6 | $300 | $1,800 | $9,300 | $11,400 | 15 |
+| **Total** | | | | | | **$15,025** | **35** |
 
-Payback: 267.2s of clearing this station's spawns to earn back its $6,680 fleet cost.
+Payback: 429.3s of clearing this station's spawns to earn back its $15,025 fleet cost.
 
 ### Level total
 
-- Fleet cost (all opponents): **$20,040**
-- Income: **61/s**
+- Fleet cost (all opponents): **$55,610**
+- Income: **102/s**

@@ -34,8 +34,9 @@ export const level12: LevelConfig = {
 			color: ENEMY_COLOR,
 			...factionCollision(1),
 			ships: {
-				bulwark: { rate: 2, level: 4 },
-				wasp: { rate: 3, level: 3 },
+				skiff: { rate: 7, level: 6 },
+				bulwark: { rate: 2, level: 5 },
+				detonator: { rate: 2, level: 2 },
 			},
 		} satisfies Config,
 		{
@@ -45,8 +46,9 @@ export const level12: LevelConfig = {
 			color: ENEMY_COLOR,
 			...factionCollision(1),
 			ships: {
-				railgunLancer: { rate: 1, level: 4 },
-				scatterGun: { rate: 2, level: 3 },
+				gunner: { rate: 6, level: 6 },
+				railgunLancer: { rate: 2, level: 4 },
+				scatterGun: { rate: 3, level: 3 },
 			},
 		} satisfies Config,
 	],

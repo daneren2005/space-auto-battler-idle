@@ -224,7 +224,7 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		baseShields: 0, contactDamage: 0,
 		weapon: { range: 160, fireInterval: 1.4, projectileCount: 3, spread: 0.3, projectileSpeed: 160, damage: 1, homing: true, strafe: true, projectileNoun: 'Missile' },
 		killReward: 3,
-		unlockCost: 120, ...tierEconomy(120),
+		unlockCost: 160, ...tierEconomy(160),
 	},
 	// Long-range glass cannon: one very-high-damage slug, long reload, shieldless.
 	railgunLancer: {
@@ -235,7 +235,7 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		baseShields: 0, contactDamage: 0,
 		weapon: { range: 260, fireInterval: 3, projectileCount: 1, projectileSpeed: 500, damage: 6, projectileNoun: 'Slug' },
 		killReward: 4,
-		unlockCost: 200, ...tierEconomy(200),
+		unlockCost: 280, ...tierEconomy(280),
 	},
 	// AoE kamikaze: explodes on contact across a blast radius, then dies.
 	detonator: {
@@ -246,7 +246,7 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		baseShields: 0, contactDamage: 4,
 		detonateOnContact: { blastRadius: 40 },
 		killReward: 4,
-		unlockCost: 160, ...tierEconomy(160),
+		unlockCost: 220, ...tierEconomy(220),
 	},
 	// Shield tank: lots of shields (and extra per level), a short-range light gun.
 	bulwark: {
@@ -257,7 +257,7 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		baseShields: 6, contactDamage: 2, shieldsPerLevel: 2,
 		weapon: { range: 70, fireInterval: 1, projectileCount: 1, projectileSpeed: 200, damage: 1, projectileNoun: 'Bullet' },
 		killReward: 5,
-		unlockCost: 220, ...tierEconomy(220),
+		unlockCost: 300, ...tierEconomy(300),
 	},
 	// Rapid swarm skirmisher: very fast and tiny, rapid short-range pellets.
 	wasp: {
@@ -268,7 +268,7 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		baseShields: 0, contactDamage: 0,
 		weapon: { range: 60, fireInterval: 0.25, projectileCount: 1, projectileSpeed: 220, damage: 1, projectileNoun: 'Pellet' },
 		killReward: 2,
-		unlockCost: 90, ...tierEconomy(90),
+		unlockCost: 120, ...tierEconomy(120),
 	},
 	// Shotgun / anti-swarm: many low-damage pellets in a short-range spread.
 	scatterGun: {
@@ -279,7 +279,7 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		baseShields: 1, contactDamage: 0,
 		weapon: { range: 80, fireInterval: 0.9, projectileCount: 5, spread: 0.5, projectileSpeed: 200, damage: 1, projectileNoun: 'Pellet' },
 		killReward: 3,
-		unlockCost: 140, ...tierEconomy(140),
+		unlockCost: 190, ...tierEconomy(190),
 	},
 	// Chain / multi-hit: three short-range homing arcs each seek a target.
 	stormcaller: {
@@ -290,7 +290,7 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		baseShields: 2, contactDamage: 0,
 		weapon: { range: 90, fireInterval: 1.1, projectileCount: 3, spread: 0.8, projectileSpeed: 240, damage: 1, homing: true, homingTurn: 45, projectileNoun: 'Arc' },
 		killReward: 5,
-		unlockCost: 260, ...tierEconomy(260),
+		unlockCost: 360, ...tierEconomy(360),
 	},
 	// Spawner: its "weapon" launches drone sub-ships instead of projectiles, gaining a drone every third level.
 	carrier: {
@@ -301,6 +301,6 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		baseShields: 3, contactDamage: 0, shieldsPerLevel: 2, levelsPerDrone: 3,
 		weapon: { range: 220, fireInterval: 2.5, projectileCount: 2, spread: 0.6, projectileSpeed: 120, damage: 0, spawnsDrones: true },
 		killReward: 8,
-		unlockCost: 400, ...tierEconomy(400),
+		unlockCost: 550, ...tierEconomy(550),
 	},
 };

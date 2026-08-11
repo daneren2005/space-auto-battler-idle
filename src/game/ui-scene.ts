@@ -44,6 +44,16 @@ interface Chip {
 const AFFORD_TINT = 0xffffff;
 const DENY_TINT = 0x8899aa;
 
+// Red used for destructive controls (the Reset Progress button + its confirm step).
+const DANGER_TINT = 0xff8a8a;
+
+// Pause menu geometry; the square pause button sits in the top-right of the top HUD band, its modal panel is centred.
+const PAUSE_BUTTON_SIZE = 52;
+const PAUSE_PANEL_WIDTH = 520;
+const PAUSE_PANEL_HEIGHT = 560;
+const PAUSE_MENU_BUTTON_WIDTH = 300;
+const PAUSE_MENU_BUTTON_HEIGHT = 64;
+
 // Milliseconds before a level-change toast dismisses itself; a tap dismisses it sooner.
 const TOAST_DURATION = 10000;
 
@@ -94,6 +104,14 @@ export default class UIScene extends Phaser.Scene {
 	private statsText!: Phaser.GameObjects.BitmapText;
 	private statsVisible = false;
 
+	// Pause menu: the top-right button opens a modal with Resume + Reset Progress. Reset swaps the menu into a
+	// two-step confirm before it wipes the run. The GameScene owns the actual paused flag; this only drives it.
+	private pauseButton!: Phaser.GameObjects.Container;
+	private pauseMenu!: Phaser.GameObjects.Container;
+	private pauseMainButtons!: Phaser.GameObjects.Container;
+	private pauseConfirmButtons!: Phaser.GameObjects.Container;
+	private resetButton!: Phaser.GameObjects.Container;
+
 	constructor() {
 		super('ui');
 	}
@@ -125,6 +143,7 @@ export default class UIScene extends Phaser.Scene {
 		this.buildDrawer(width, height);
 		this.buildToast(width);
 		this.buildStatsPanel(width);
+		this.buildPauseMenu(width, height);
 	}
 
 	update() {
@@ -147,6 +166,7 @@ export default class UIScene extends Phaser.Scene {
 		if(this.gameScene.gameState !== 'playing') {
 			this.closeCard();
 			this.closeDrawer();
+			this.closePauseMenu();
 		}
 
 		const notice = this.gameScene.takeNotice();
@@ -226,7 +246,7 @@ export default class UIScene extends Phaser.Scene {
 
 	// Draggable only while no overlay is up and the gesture is in the bottom band.
 	private canDragFleetBar(pointer: Phaser.Input.Pointer, height: number): boolean {
-		return !this.card.visible && !this.drawer.visible
+		return !this.card.visible && !this.drawer.visible && !this.pauseMenu.visible
 			&& pointer.y >= height - HUD_BOTTOM_HEIGHT;
 	}
 
@@ -490,6 +510,97 @@ export default class UIScene extends Phaser.Scene {
 			this.statsVisible = !this.statsVisible;
 			this.statsPanel.setVisible(this.statsVisible);
 		});
+	}
+
+	// --- Pause menu ------------------------------------------------------------------------------------------
+
+	private buildPauseMenu(width: number, height: number) {
+		// Square button in the top-right of the top HUD band. "II" is the pause glyph (the font is ASCII-only).
+		const buttonBackground = this.add.image(0, 0, 'ui-button')
+			.setDisplaySize(PAUSE_BUTTON_SIZE, PAUSE_BUTTON_SIZE)
+			.setInteractive({ useHandCursor: true });
+		const buttonLabel = this.add.bitmapText(0, 0, FONT, 'II', 22).setOrigin(0.5).setCenterAlign().setTintFill(0xffffff);
+		this.pauseButton = this.add.container(width - 24 - PAUSE_BUTTON_SIZE / 2, 34, [buttonBackground, buttonLabel]);
+		buttonBackground.on('pointerup', () => this.openPauseMenu());
+
+		const cx = width / 2;
+		const cy = height / 2;
+
+		// Modal dim; interactive so a tap outside the panel is swallowed rather than resuming by accident.
+		const overlay = this.add.rectangle(cx, cy, width, height, 0x03060f, 0.72).setInteractive();
+		const panel = this.add.image(cx, cy, 'ui-window').setDisplaySize(PAUSE_PANEL_WIDTH, PAUSE_PANEL_HEIGHT).setInteractive();
+		const heading = this.add.bitmapText(cx, cy - 200, FONT, 'PAUSED', 34).setOrigin(0.5).setCenterAlign().setTintFill(0xcfe6ff);
+
+		// Main state: Reset Progress (destructive, shown only for a real run) above Resume, the primary action, at the bottom.
+		this.resetButton = this.makeMenuButton(cx, cy - 30, 'Reset Progress', 'ui-button', () => this.showPauseConfirm(), DANGER_TINT);
+		const resume = this.makeMenuButton(cx, cy + 90, 'Resume', 'ui-button-green', () => this.closePauseMenu());
+		this.pauseMainButtons = this.add.container(0, 0, [this.resetButton, resume]);
+
+		// Confirm state: a warning + the two-step commit (Reset Everything) or back out (Cancel).
+		const warning = this.add.bitmapText(cx, cy - 96, FONT, 'Wipe your entire run and\nrestart from level 1?', 20)
+			.setOrigin(0.5).setCenterAlign().setTintFill(0xff8a8a);
+		const confirm = this.makeMenuButton(cx, cy + 20, 'Reset Everything', 'ui-button', () => this.confirmReset(), DANGER_TINT);
+		const cancel = this.makeMenuButton(cx, cy + 120, 'Cancel', 'ui-button-green', () => this.showPauseMain());
+		this.pauseConfirmButtons = this.add.container(0, 0, [warning, confirm, cancel]).setVisible(false);
+
+		this.pauseMenu = this.add.container(0, 0, [overlay, panel, heading, this.pauseMainButtons, this.pauseConfirmButtons])
+			.setDepth(90).setVisible(false);
+
+		// SPACE mirrors the button: toggles the menu (and so the pause) while a match is live.
+		this.input.keyboard?.on('keydown-SPACE', () => {
+			if(this.pauseMenu.visible) {
+				this.closePauseMenu();
+			} else {
+				this.openPauseMenu();
+			}
+		});
+	}
+
+	private makeMenuButton(x: number, y: number, text: string, texture: string, onClick: () => void, tint?: number): Phaser.GameObjects.Container {
+		const background = this.add.image(0, 0, texture)
+			.setDisplaySize(PAUSE_MENU_BUTTON_WIDTH, PAUSE_MENU_BUTTON_HEIGHT)
+			.setInteractive({ useHandCursor: true });
+		if(tint !== undefined) {
+			background.setTint(tint);
+		}
+		const label = this.add.bitmapText(0, 0, FONT, text, 20).setOrigin(0.5).setCenterAlign().setTintFill(0xffffff);
+		background.on('pointerup', onClick);
+		return this.add.container(x, y, [background, label]);
+	}
+
+	private openPauseMenu() {
+		if(this.gameScene.gameState !== 'playing') {
+			return;
+		}
+		this.closeCard();
+		this.closeDrawer();
+		this.showPauseMain();
+		this.pauseMenu.setVisible(true);
+		this.gameScene.setPaused(true);
+	}
+
+	private closePauseMenu() {
+		if(!this.pauseMenu.visible) {
+			return;
+		}
+		this.pauseMenu.setVisible(false);
+		this.gameScene.setPaused(false);
+	}
+
+	private showPauseMain() {
+		this.resetButton.setVisible(this.gameScene.canResetProgress);
+		this.pauseMainButtons.setVisible(true);
+		this.pauseConfirmButtons.setVisible(false);
+	}
+
+	private showPauseConfirm() {
+		this.pauseMainButtons.setVisible(false);
+		this.pauseConfirmButtons.setVisible(true);
+	}
+
+	private confirmReset() {
+		this.pauseMenu.setVisible(false);
+		this.gameScene.resetProgressToStart();
 	}
 
 	// --- Level-change toast ----------------------------------------------------------------------------------

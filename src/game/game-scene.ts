@@ -187,12 +187,6 @@ export default class GameScene extends Phaser.Scene {
 		// Deliberately nothing listens to POSITION_UPDATED_EVENT (fires per 50ms step, would stutter). That also
 		// lets PhysicsSystem skip cloning the moved-id array across the worker boundary.
 
-		this.input.keyboard?.on('keydown-SPACE', () => {
-			if(this.state === 'playing') {
-				this.paused = !this.paused;
-			}
-		});
-
 		this.loadLevel(this.level, this.carry);
 
 		this.scene.launch('ui');
@@ -490,6 +484,34 @@ export default class GameScene extends Phaser.Scene {
 
 	get shipRoster(): ShipRoster | undefined {
 		return this.roster;
+	}
+
+	// --- Pause / reset, driven by the HUD's pause menu --------------------------------------------------
+
+	get isPaused(): boolean {
+		return this.paused;
+	}
+
+	// Only meaningful mid-match: a decided match already freezes the simulation on its own.
+	setPaused(paused: boolean): void {
+		if(this.state === 'playing') {
+			this.paused = paused;
+		}
+	}
+
+	// Reset Progress is offered only for a real run; a scratch level (the stress test) must not wipe the save.
+	get canResetProgress(): boolean {
+		return this.persistProgress;
+	}
+
+	// Wipe the save and restart from level 1 with an empty carry, behind the usual between-levels fade. The
+	// queued swap runs before update()'s pause early-return, so it fires even with the menu still paused.
+	resetProgressToStart(): void {
+		resetProgress();
+		this.queueTransition(() => {
+			this.pendingNotice = { message: 'Progress reset - starting a fresh run.', tone: 'bad' };
+			this.loadLevel(firstLevel, emptyCarry());
+		});
 	}
 
 	// --- Automatic level progression --------------------------------------------------------------------

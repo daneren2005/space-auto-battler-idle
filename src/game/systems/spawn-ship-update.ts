@@ -3,7 +3,7 @@ import type { EntityUpdateFunction } from '@daneren2005/shared-memory-ecs';
 import { TRANSFORM_X_INDEX, TRANSFORM_Y_INDEX, BODY_CATEGORY_INDEX, BODY_MASK_INDEX } from '@daneren2005/shared-memory-physics';
 import type { Components, ComponentArrays } from '../components';
 import computeAngle from '@/math/compute-angle';
-import { SHIP_TYPES, SHIP_TYPE_INDEX, SHIP_TYPE_DEFS, shieldsForLevel, contactDamageForLevel, weaponDamageForLevel, droneCountForLevel } from '@/data/ship-types';
+import { SHIP_TYPES, SHIP_TYPE_INDEX, SHIP_TYPE_DEFS, shieldsForLevel, contactDamageForLevel, weaponDamageForLevel, projectileCountForLevel } from '@/data/ship-types';
 import { hangarRateIndex, hangarLevelIndex, hangarProgressIndex } from '../components/hangar';
 import { seedRand, type SeededWorld } from './seeded-world';
 
@@ -54,8 +54,8 @@ export const spawnShipUpdate: EntityUpdateFunction<Components, Pick<ComponentArr
 		const maxShields = shieldsForLevel(def, level);
 		const contactDamage = contactDamageForLevel(def, level);
 		const weaponDamage = def.weapon ? weaponDamageForLevel(def, level) : undefined;
-		// A drone-spawner (the Carrier) scales its drone count with level too; every other type keeps a fixed count.
-		const weaponProjectileCount = def.weapon?.spawnsDrones ? droneCountForLevel(def, level) : undefined;
+		// Any weapon whose volley (or a Carrier's drone launch) grows with level is stamped its level-scaled count.
+		const weaponProjectileCount = def.weapon ? projectileCountForLevel(def, level) : undefined;
 
 		for(let i = 0; i < spawning; i++) {
 			// Rolled per ship, so a batch leaves as a spread rather than a convoy.

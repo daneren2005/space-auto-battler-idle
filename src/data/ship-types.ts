@@ -45,6 +45,20 @@ export interface WeaponDef {
 	projectileNoun?: string
 }
 
+// Which stat a progression track grows. `projectiles` covers a volley's shot count and a Carrier's drone count.
+export type ProgressionStat = 'shields' | 'damage' | 'projectiles';
+
+// One stat growing on a cadence: `+amount` (default 1) every `every` levels. `phase` (default 1) picks which
+// levels grant - `phase 1` grants at level 1+every, 1+2*every, ... (the "every N-th level past the first" feel,
+// matching the old floor((level-1)/N) default); use `phase 0` with `every 2` to grant on the even levels so two
+// tracks can alternate (the Detonator: damage on even levels, shields on odd).
+export interface ProgressionTrack {
+	stat: ProgressionStat
+	every: number
+	amount?: number
+	phase?: number
+}
+
 export interface ShipTypeDef {
 	name: string
 	sprite: string
@@ -59,12 +73,10 @@ export interface ShipTypeDef {
 	baseShields: number
 	// Ram damage (0 = keeps its distance).
 	contactDamage: number
-	// Each level past 1 adds `shieldsPerLevel` shields (default 1); every `levelsPerDamage` levels adds 1 damage
-	// (default 4). Level 0 is locked, level 1 is the base ship.
-	shieldsPerLevel?: number
-	levelsPerDamage?: number
-	// Drone-count equivalent of `levelsPerDamage` (the Carrier).
-	levelsPerDrone?: number
+	// Per-ship level-up schedule: each track grows one stat on its own cadence, so a ship's identity comes through
+	// as it levels (Gunner damage every level, Missile Frigate a shot every level, the Detonator alternating, ...).
+	// Level 0 is locked, level 1 is the base ship; the tracks only add from level 2 up.
+	progression: Array<ProgressionTrack>
 	weapon?: WeaponDef
 	// If set, explodes on contact across `blastRadius` and dies (the Detonator).
 	detonateOnContact?: { blastRadius: number }
@@ -78,46 +90,58 @@ export interface ShipTypeDef {
 	levelCostGrowth: number
 }
 
-export function shieldsForLevel(def: ShipTypeDef, level: number): number {
-	if(level <= 1) {
-		return def.baseShields;
-	}
-	return def.baseShields + (level - 1) * (def.shieldsPerLevel ?? 1);
-}
-
-function damageBonusForLevel(def: ShipTypeDef, level: number): number {
+// How many times a track has fired by `level`: the count of levels L in [2, level] with L congruent to phase mod
+// every. Closed form off the first qualifying level so it stays O(1) (called per spawn in the worker).
+function grantsForTrack(level: number, every: number, phase = 1): number {
 	if(level <= 1) {
 		return 0;
 	}
-	return Math.floor((level - 1) / (def.levelsPerDamage ?? 4));
+	const residue = ((phase % every) + every) % every;
+	let first = 2 + ((residue - 2) % every + every) % every;
+	if(first > level) {
+		return 0;
+	}
+	return Math.floor((level - first) / every) + 1;
+}
+
+function statBonusForLevel(def: ShipTypeDef, level: number, stat: ProgressionStat): number {
+	let total = 0;
+	for(const track of def.progression) {
+		if(track.stat === stat) {
+			total += grantsForTrack(level, track.every, track.phase) * (track.amount ?? 1);
+		}
+	}
+	return total;
+}
+
+export function shieldsForLevel(def: ShipTypeDef, level: number): number {
+	return def.baseShields + statBonusForLevel(def, level, 'shields');
 }
 
 export function contactDamageForLevel(def: ShipTypeDef, level: number): number {
-	return def.contactDamage + damageBonusForLevel(def, level);
+	return def.contactDamage + statBonusForLevel(def, level, 'damage');
 }
 
 export function weaponDamageForLevel(def: ShipTypeDef, level: number): number {
 	if(!def.weapon) {
 		return 0;
 	}
-	return def.weapon.damage + damageBonusForLevel(def, level);
+	return def.weapon.damage + statBonusForLevel(def, level, 'damage');
 }
 
-const DEFAULT_LEVELS_PER_DRONE = 3;
-
-// Safe to call for any weapon: a non-drone-spawner (or below level 2) just returns its base count.
-export function droneCountForLevel(def: ShipTypeDef, level: number): number {
+// A volley's shot count (or a Carrier's drones per launch) scaled by its `projectiles` tracks. Safe for any weapon.
+export function projectileCountForLevel(def: ShipTypeDef, level: number): number {
 	const base = def.weapon?.projectileCount ?? 1;
-	if(!def.weapon?.spawnsDrones || level <= 1) {
+	if(!def.weapon) {
 		return base;
 	}
-	return base + Math.floor((level - 1) / (def.levelsPerDrone ?? DEFAULT_LEVELS_PER_DRONE));
+	return base + statBonusForLevel(def, level, 'projectiles');
 }
 
 // The type's headline offensive stat, as a label + value in its own terms.
 export function combatStat(def: ShipTypeDef, level: number): { label: string, value: number } {
 	if(def.weapon?.spawnsDrones) {
-		return { label: 'Drones/launch', value: droneCountForLevel(def, level) };
+		return { label: 'Drones/launch', value: projectileCountForLevel(def, level) };
 	}
 	if(def.weapon) {
 		return { label: `${def.weapon.projectileNoun ?? 'Shot'} damage`, value: weaponDamageForLevel(def, level) };
@@ -138,13 +162,15 @@ export function nextLevelSummary(def: ShipTypeDef, level: number): string {
 		parts.push(`+${shieldGain} shield${shieldGain === 1 ? '' : 's'}`);
 	}
 
-	// A drone-spawner grows its swarm, not its per-shot damage.
-	if(def.weapon?.spawnsDrones) {
-		const droneGain = droneCountForLevel(def, next) - droneCountForLevel(def, level);
-		if(droneGain > 0) {
-			parts.push(`+${droneGain} drone${droneGain === 1 ? '' : 's'}`);
-		}
-	} else {
+	// A grown volley reads in its own terms: a Carrier's drones, else the weapon's shot noun (missile/pellet/arc).
+	const countGain = projectileCountForLevel(def, next) - projectileCountForLevel(def, level);
+	if(countGain > 0) {
+		const noun = def.weapon?.spawnsDrones ? 'drone' : (def.weapon?.projectileNoun ?? 'shot').toLowerCase();
+		parts.push(`+${countGain} ${noun}${countGain === 1 ? '' : 's'}`);
+	}
+
+	// A drone-spawner has no per-shot damage to grow, so only non-spawners report a damage step.
+	if(!def.weapon?.spawnsDrones) {
 		const damageGain = def.weapon
 			? weaponDamageForLevel(def, next) - weaponDamageForLevel(def, level)
 			: contactDamageForLevel(def, next) - contactDamageForLevel(def, level);
@@ -201,6 +227,7 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		width: 10, height: 5,
 		speed: 100, steerForce: 10, steerBonus: 0.5,
 		baseShields: 0, contactDamage: 1,
+		progression: [{ stat: 'shields', every: 1 }, { stat: 'damage', every: 4 }],
 		killReward: 1,
 		unlockCost: 0, ...SKIFF_ECONOMY,
 	},
@@ -211,6 +238,8 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		width: 12, height: 8,
 		speed: 80, steerForce: 8, steerBonus: 0.2,
 		baseShields: 1, contactDamage: 0,
+		// A dedicated gun: damage climbs every level, with only an occasional shield.
+		progression: [{ stat: 'damage', every: 1 }, { stat: 'shields', every: 3 }],
 		weapon: { range: 120, fireInterval: 0.6, projectileCount: 1, projectileSpeed: 260, damage: 1, projectileNoun: 'Bullet' },
 		killReward: 2,
 		unlockCost: 40, ...tierEconomy(40),
@@ -222,6 +251,8 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		width: 16, height: 10,
 		speed: 60, steerForce: 3, steerBonus: 0.4,
 		baseShields: 0, contactDamage: 0,
+		// A swarm: one more missile every level, an occasional shield, and its per-missile damage only every 4th.
+		progression: [{ stat: 'projectiles', every: 1 }, { stat: 'shields', every: 3 }, { stat: 'damage', every: 4 }],
 		weapon: { range: 160, fireInterval: 1.4, projectileCount: 3, spread: 0.3, projectileSpeed: 160, damage: 1, homing: true, strafe: true, projectileNoun: 'Missile' },
 		killReward: 3,
 		unlockCost: 160, ...tierEconomy(160),
@@ -233,6 +264,8 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		width: 18, height: 6,
 		speed: 45, steerForce: 2.5, steerBonus: 0.1,
 		baseShields: 0, contactDamage: 0,
+		// Ever-heavier slug: damage every level, with only an occasional shield to keep it glassy.
+		progression: [{ stat: 'damage', every: 1 }, { stat: 'shields', every: 3 }],
 		weapon: { range: 260, fireInterval: 3, projectileCount: 1, projectileSpeed: 500, damage: 6, projectileNoun: 'Slug' },
 		killReward: 4,
 		unlockCost: 280, ...tierEconomy(280),
@@ -244,6 +277,8 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		width: 12, height: 12,
 		speed: 90, steerForce: 9, steerBonus: 0.5,
 		baseShields: 0, contactDamage: 4,
+		// Alternates each level: a bigger blast on the even levels, another shield on the odd.
+		progression: [{ stat: 'damage', every: 2, phase: 0 }, { stat: 'shields', every: 2, phase: 1 }],
 		detonateOnContact: { blastRadius: 40 },
 		killReward: 4,
 		unlockCost: 220, ...tierEconomy(220),
@@ -254,8 +289,10 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		sprite: 'ships/bulwark.png',
 		width: 20, height: 16,
 		speed: 50, steerForce: 2.5, steerBonus: 0.2,
-		baseShields: 6, contactDamage: 2, shieldsPerLevel: 2,
-		weapon: { range: 70, fireInterval: 1, projectileCount: 1, projectileSpeed: 200, damage: 1, projectileNoun: 'Bullet' },
+		baseShields: 6, contactDamage: 2,
+		// Wall: two shields every level, a little damage every 4th.
+		progression: [{ stat: 'shields', every: 1, amount: 2 }, { stat: 'damage', every: 4 }],
+		weapon: { range: 40, fireInterval: 1, projectileCount: 1, projectileSpeed: 200, damage: 1, projectileNoun: 'Bullet' },
 		killReward: 5,
 		unlockCost: 300, ...tierEconomy(300),
 	},
@@ -266,6 +303,8 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		width: 8, height: 6,
 		speed: 140, steerForce: 14, steerBonus: 0.6,
 		baseShields: 0, contactDamage: 0,
+		// Pure glass: damage every level and never a shield - it lives or dies on speed.
+		progression: [{ stat: 'damage', every: 1 }],
 		weapon: { range: 60, fireInterval: 0.25, projectileCount: 1, projectileSpeed: 220, damage: 1, projectileNoun: 'Pellet' },
 		killReward: 2,
 		unlockCost: 120, ...tierEconomy(120),
@@ -277,6 +316,8 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		width: 14, height: 10,
 		speed: 70, steerForce: 7, steerBonus: 0.1,
 		baseShields: 1, contactDamage: 0,
+		// A widening spread: one more pellet every level, its per-pellet damage and a shield only occasionally.
+		progression: [{ stat: 'projectiles', every: 1 }, { stat: 'damage', every: 3 }, { stat: 'shields', every: 3 }],
 		weapon: { range: 80, fireInterval: 0.9, projectileCount: 5, spread: 0.5, projectileSpeed: 200, damage: 1, projectileNoun: 'Pellet' },
 		killReward: 3,
 		unlockCost: 190, ...tierEconomy(190),
@@ -288,17 +329,21 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		width: 14, height: 12,
 		speed: 65, steerForce: 1, steerBonus: 0.5,
 		baseShields: 2, contactDamage: 0,
+		// Alternates arcs and power: another arc on the odd levels, more per-arc damage on the even, a rare shield.
+		progression: [{ stat: 'projectiles', every: 2, phase: 1 }, { stat: 'damage', every: 2, phase: 0 }, { stat: 'shields', every: 3 }],
 		weapon: { range: 90, fireInterval: 1.1, projectileCount: 3, spread: 0.8, projectileSpeed: 240, damage: 1, homing: true, homingTurn: 45, projectileNoun: 'Arc' },
 		killReward: 5,
 		unlockCost: 360, ...tierEconomy(360),
 	},
-	// Spawner: its "weapon" launches drone sub-ships instead of projectiles, gaining a drone every third level.
+	// Spawner: its "weapon" launches drone sub-ships instead of projectiles, gaining a drone every level.
 	carrier: {
 		name: 'Carrier',
 		sprite: 'ships/carrier.png',
 		width: 24, height: 18,
 		speed: 40, steerForce: 0.5, steerBonus: 0.03,
-		baseShields: 3, contactDamage: 0, shieldsPerLevel: 2, levelsPerDrone: 3,
+		baseShields: 3, contactDamage: 0,
+		// A growing flight deck: a new drone every level, with two shields every 3rd to offset the swarm.
+		progression: [{ stat: 'projectiles', every: 1 }, { stat: 'shields', every: 3, amount: 2 }],
 		weapon: { range: 220, fireInterval: 2.5, projectileCount: 2, spread: 0.6, projectileSpeed: 120, damage: 0, spawnsDrones: true },
 		killReward: 8,
 		unlockCost: 550, ...tierEconomy(550),

@@ -152,6 +152,12 @@ Tests live in `__tests__/` folders next to the code (`*.spec.ts`).
 - **Add a ship type** → add a key to `SHIP_TYPES` + its def in [ship-types.ts](../src/data/ship-types.ts).
   The factory, weapon/spawn/projectile/collision systems already handle whatever a def describes. Add a
   sprite (see [plans/05-assets.md](../plans/05-assets.md)) and update relevant tests.
+- **Tune how a ship levels up** → each def carries a `progression: ProgressionTrack[]`; each track grows one
+  stat (`shields` / `damage` / `projectiles`) by `amount` (default 1) every `every` levels, with `phase`
+  (default 1) picking which levels grant. `phase 1` is the "every Nth level past the first" cadence; two
+  `every: 2` tracks with `phase 0` (even) and `phase 1` (odd) alternate. `shieldsForLevel` /
+  `weaponDamageForLevel` / `contactDamageForLevel` / `projectileCountForLevel` sum the matching tracks; the
+  spawn worker stamps the level-scaled shields/damage/shot-count onto each ship it builds.
 - **Add a level** → new `level-N.ts` in [data/levels/](../src/data/levels/), export it from `index.ts`, and
   set the previous level's `nextLevel`.
 - **Add a system** → create the `x-system.ts` / `x-update.ts` / `x.worker.ts` triple, then `addSystem` it in

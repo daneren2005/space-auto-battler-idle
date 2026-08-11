@@ -100,13 +100,13 @@ describe('ship roster defs', () => {
 		expect(isShipType('projectile')).toBe(false);
 	});
 
-	it('scales weapon damage with level on the same cadence as contact damage', () => {
-		// The Railgun deals 6 per shot at level 1 and gains one every four levels (the default cadence).
+	it('scales the Railgun\'s slug damage every level', () => {
+		// The Railgun deals 6 per shot at level 1 and gains one every level thereafter.
 		const railgun = SHIP_TYPE_DEFS.railgunLancer;
 		expect(weaponDamageForLevel(railgun, 1)).toBe(6);
-		expect(weaponDamageForLevel(railgun, 4)).toBe(6);
-		expect(weaponDamageForLevel(railgun, 5)).toBe(7);
-		expect(weaponDamageForLevel(railgun, 9)).toBe(8);
+		expect(weaponDamageForLevel(railgun, 4)).toBe(9);
+		expect(weaponDamageForLevel(railgun, 5)).toBe(10);
+		expect(weaponDamageForLevel(railgun, 9)).toBe(14);
 		// A rammer has no weapon damage to scale.
 		expect(weaponDamageForLevel(SHIP_TYPE_DEFS.skiff, 5)).toBe(0);
 	});

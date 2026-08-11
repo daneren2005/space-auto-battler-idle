@@ -8,157 +8,170 @@ a level with the time spent on it, the money in hand, and each built type as `ra
    0.0s  --- LEVEL 1 level-1 "First Contact"  start $0  [skiff r1/l1]
    7.4s  BUY level  skiff          $5  (now r1/l2, $0 left)
   15.4s  BUY rate   skiff          $10  (now r2/l2, $0 left)
-  18.9s  WIN level-1 "First Contact"  18.9s on level  $3  [skiff r2/l2]
-  18.9s  --- LEVEL 2 level-2 "Escalation"  start $3  [skiff r2/l2]
-  25.5s  BUY level  skiff          $10  (now r2/l3, $0 left)
-  34.5s  BUY rate   skiff          $20  (now r3/l3, $0 left)
-  34.7s  DIE level-2 "Escalation"  15.8s on level  $1  [skiff r3/l3]  death 1/10
-  34.7s  --- LEVEL 1 level-1 "First Contact"  start $1  [skiff r3/l3]
-  41.5s  WIN level-1 "First Contact"  6.8s on level  $7  [skiff r3/l3]
-  41.5s  --- LEVEL 2 level-2 "Escalation"  start $7  [skiff r3/l3]
-  50.0s  BUY level  skiff          $20  (now r3/l4, $0 left)
-  55.2s  WIN level-2 "Escalation"  13.7s on level  $28  [skiff r3/l4]
-  55.2s  --- LEVEL 3 level-3 "Probe"  start $28  [skiff r3/l4]
-  67.3s  BUY rate   skiff          $40  (now r4/l4, $0 left)
-  74.2s  DIE level-3 "Probe"  19.0s on level  $19  [skiff r4/l4]  death 1/10
-  74.2s  --- LEVEL 2 level-2 "Escalation"  start $19  [skiff r4/l4]
-  82.7s  BUY level  skiff          $40  (now r4/l5, $0 left)
-  83.6s  WIN level-2 "Escalation"  9.4s on level  $7  [skiff r4/l5]
-  83.6s  --- LEVEL 3 level-3 "Probe"  start $7  [skiff r4/l5]
-  92.5s  BUY unlock gunner         $40  (now r1/l1, $0 left)
-  93.1s  WIN level-3 "Probe"  9.5s on level  $5  [skiff r4/l5 gunner r1/l1]
-  93.1s  --- LEVEL 4 level-4 "Vanguard"  start $5  [skiff r4/l5 gunner r1/l1]
- 101.7s  BUY level  gunner         $40  (now r1/l2, $1 left)
- 105.9s  WIN level-4 "Vanguard"  12.7s on level  $41  [skiff r4/l5 gunner r1/l2]
- 105.9s  --- LEVEL 5 level-5 "Escort"  start $41  [skiff r4/l5 gunner r1/l2]
- 114.4s  BUY rate   skiff          $80  (now r5/l5, $0 left)
- 118.8s  WIN level-5 "Escort"  12.9s on level  $75  [skiff r5/l5 gunner r1/l2]
- 118.8s  --- LEVEL 6 level-6 "Crossfire"  start $75  [skiff r5/l5 gunner r1/l2]
- 123.2s  BUY level  skiff          $80  (now r5/l6, $0 left)
- 131.1s  BUY rate   gunner         $80  (now r2/l2, $1 left)
- 131.3s  WIN level-6 "Crossfire"  12.5s on level  $26  [skiff r5/l6 gunner r2/l2]
- 131.3s  --- LEVEL 7 level-7 "Bastion"  start $26  [skiff r5/l6 gunner r2/l2]
- 146.8s  BUY level  gunner         $80  (now r2/l3, $0 left)
- 149.7s  DIE level-7 "Bastion"  18.3s on level  $27  [skiff r5/l6 gunner r2/l3]  death 1/10
- 149.7s  --- LEVEL 6 level-6 "Crossfire"  start $27  [skiff r5/l6 gunner r2/l3]
- 160.9s  WIN level-6 "Crossfire"  11.2s on level  $127  [skiff r5/l6 gunner r2/l3]
- 160.9s  --- LEVEL 7 level-7 "Bastion"  start $127  [skiff r5/l6 gunner r2/l3]
- 160.9s  BUY unlock wasp           $120  (now r1/l1, $7 left)
- 180.7s  BUY level  wasp           $120  (now r1/l2, $1 left)
- 199.1s  BUY rate   skiff          $160  (now r6/l6, $0 left)
- 209.6s  DIE level-7 "Bastion"  48.7s on level  $92  [skiff r6/l6 gunner r2/l3 wasp r1/l2]  death 2/10
- 209.6s  --- LEVEL 6 level-6 "Crossfire"  start $92  [skiff r6/l6 gunner r2/l3 wasp r1/l2]
- 220.3s  BUY level  skiff          $160  (now r6/l7, $0 left)
- 220.9s  WIN level-6 "Crossfire"  11.3s on level  $32  [skiff r6/l7 gunner r2/l3 wasp r1/l2]
- 220.9s  --- LEVEL 7 level-7 "Bastion"  start $32  [skiff r6/l7 gunner r2/l3 wasp r1/l2]
- 242.6s  BUY rate   gunner         $160  (now r3/l3, $0 left)
- 258.8s  BUY level  gunner         $160  (now r3/l4, $1 left)
- 273.6s  BUY unlock missileFrigate $160  (now r1/l1, $7 left)
- 285.5s  BUY level  missileFrigate $160  (now r1/l2, $0 left)
- 298.0s  BUY unlock scatterGun     $190  (now r1/l1, $0 left)
- 311.6s  BUY level  scatterGun     $190  (now r1/l2, $0 left)
- 326.9s  BUY unlock detonator      $220  (now r1/l1, $1 left)
- 343.8s  BUY level  detonator      $220  (now r1/l2, $1 left)
- 355.2s  BUY rate   wasp           $240  (now r2/l2, $0 left)
- 367.8s  BUY level  wasp           $240  (now r2/l3, $2 left)
- 380.6s  BUY unlock railgunLancer  $280  (now r1/l1, $0 left)
- 390.4s  BUY level  railgunLancer  $280  (now r1/l2, $1 left)
- 402.6s  WIN level-7 "Bastion"  181.6s on level  $376  [skiff r6/l7 gunner r3/l4 missileFrigate r1/l2 railgunLancer r1/l2 detonator r1/l2 wasp r2/l3 scatterGun r1/l2]
- 402.6s  --- LEVEL 8 level-8 "Pincer"  start $376  [skiff r6/l7 gunner r3/l4 missileFrigate r1/l2 railgunLancer r1/l2 detonator r1/l2 wasp r2/l3 scatterGun r1/l2]
- 402.6s  BUY unlock bulwark        $300  (now r1/l1, $76 left)
- 418.6s  BUY level  bulwark        $300  (now r1/l2, $0 left)
- 431.9s  BUY rate   skiff          $320  (now r7/l7, $2 left)
- 442.7s  BUY level  skiff          $320  (now r7/l8, $3 left)
- 447.6s  WIN level-8 "Pincer"  45.0s on level  $254  [skiff r7/l8 gunner r3/l4 missileFrigate r1/l2 railgunLancer r1/l2 detonator r1/l2 bulwark r1/l2 wasp r2/l3 scatterGun r1/l2]
- 447.6s  --- LEVEL 9 level-9 "Onset"  start $254  [skiff r7/l8 gunner r3/l4 missileFrigate r1/l2 railgunLancer r1/l2 detonator r1/l2 bulwark r1/l2 wasp r2/l3 scatterGun r1/l2]
- 456.0s  BUY rate   gunner         $320  (now r4/l4, $0 left)
- 473.3s  BUY level  gunner         $320  (now r4/l5, $1 left)
- 485.1s  BUY rate   missileFrigate $320  (now r2/l2, $5 left)
- 491.4s  BUY level  missileFrigate $320  (now r2/l3, $0 left)
- 502.3s  BUY unlock stormcaller    $360  (now r1/l1, $3 left)
- 510.8s  BUY level  stormcaller    $360  (now r1/l2, $0 left)
- 518.9s  BUY rate   scatterGun     $380  (now r2/l2, $0 left)
- 527.4s  BUY level  scatterGun     $380  (now r2/l3, $0 left)
- 537.7s  BUY rate   detonator      $440  (now r2/l2, $0 left)
- 549.7s  BUY level  detonator      $440  (now r2/l3, $0 left)
- 562.3s  BUY rate   wasp           $480  (now r3/l3, $4 left)
- 572.3s  WIN level-9 "Onset"  124.7s on level  $497  [skiff r7/l8 gunner r4/l5 missileFrigate r2/l3 railgunLancer r1/l2 detonator r2/l3 bulwark r1/l2 wasp r3/l3 scatterGun r2/l3 stormcaller r1/l2]
- 572.3s  --- LEVEL 10 level-10 "Rampart"  start $497  [skiff r7/l8 gunner r4/l5 missileFrigate r2/l3 railgunLancer r1/l2 detonator r2/l3 bulwark r1/l2 wasp r3/l3 scatterGun r2/l3 stormcaller r1/l2]
- 572.3s  BUY level  wasp           $480  (now r3/l4, $17 left)
- 599.3s  BUY unlock carrier        $550  (now r1/l1, $1 left)
- 614.3s  BUY level  carrier        $550  (now r1/l2, $0 left)
- 624.5s  WIN level-10 "Rampart"  52.2s on level  $562  [skiff r7/l8 gunner r4/l5 missileFrigate r2/l3 railgunLancer r1/l2 detonator r2/l3 bulwark r1/l2 wasp r3/l4 scatterGun r2/l3 stormcaller r1/l2 carrier r1/l2]
- 624.5s  --- LEVEL 11 level-11 "Siege"  start $562  [skiff r7/l8 gunner r4/l5 missileFrigate r2/l3 railgunLancer r1/l2 detonator r2/l3 bulwark r1/l2 wasp r3/l4 scatterGun r2/l3 stormcaller r1/l2 carrier r1/l2]
- 624.5s  BUY rate   railgunLancer  $560  (now r2/l2, $2 left)
- 648.9s  BUY level  railgunLancer  $560  (now r2/l3, $0 left)
- 658.9s  WIN level-11 "Siege"  34.4s on level  $753  [skiff r7/l8 gunner r4/l5 missileFrigate r2/l3 railgunLancer r2/l3 detonator r2/l3 bulwark r1/l2 wasp r3/l4 scatterGun r2/l3 stormcaller r1/l2 carrier r1/l2]
- 658.9s  --- LEVEL 12 level-12 "Redoubt"  start $753  [skiff r7/l8 gunner r4/l5 missileFrigate r2/l3 railgunLancer r2/l3 detonator r2/l3 bulwark r1/l2 wasp r3/l4 scatterGun r2/l3 stormcaller r1/l2 carrier r1/l2]
- 658.9s  BUY rate   bulwark        $600  (now r2/l2, $153 left)
- 679.6s  BUY level  bulwark        $600  (now r2/l3, $3 left)
- 694.7s  BUY rate   skiff          $640  (now r8/l8, $0 left)
- 705.2s  BUY level  skiff          $640  (now r8/l9, $1 left)
- 711.0s  WIN level-12 "Redoubt"  52.0s on level  $708  [skiff r8/l9 gunner r4/l5 missileFrigate r2/l3 railgunLancer r2/l3 detonator r2/l3 bulwark r2/l3 wasp r3/l4 scatterGun r2/l3 stormcaller r1/l2 carrier r1/l2]
- 711.0s  --- LEVEL 13 level-13 "Deadlock"  start $708  [skiff r8/l9 gunner r4/l5 missileFrigate r2/l3 railgunLancer r2/l3 detonator r2/l3 bulwark r2/l3 wasp r3/l4 scatterGun r2/l3 stormcaller r1/l2 carrier r1/l2]
- 711.0s  BUY rate   gunner         $640  (now r5/l5, $68 left)
- 733.1s  BUY level  gunner         $640  (now r5/l6, $2 left)
- 744.9s  BUY rate   missileFrigate $640  (now r3/l3, $3 left)
- 752.4s  BUY level  missileFrigate $640  (now r3/l4, $1 left)
- 753.1s  WIN level-13 "Deadlock"  42.1s on level  $414  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r2/l3 detonator r2/l3 bulwark r2/l3 wasp r3/l4 scatterGun r2/l3 stormcaller r1/l2 carrier r1/l2]
- 753.1s  --- LEVEL 14 level-14 "Overrun"  start $414  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r2/l3 detonator r2/l3 bulwark r2/l3 wasp r3/l4 scatterGun r2/l3 stormcaller r1/l2 carrier r1/l2]
- 770.2s  BUY rate   stormcaller    $720  (now r2/l2, $1 left)
- 784.2s  BUY level  stormcaller    $720  (now r2/l3, $1 left)
- 801.0s  BUY rate   scatterGun     $760  (now r3/l3, $0 left)
- 817.6s  BUY level  scatterGun     $760  (now r3/l4, $0 left)
- 837.3s  BUY rate   detonator      $880  (now r3/l3, $5 left)
- 858.8s  BUY level  detonator      $880  (now r3/l4, $1 left)
- 875.0s  DIE level-14 "Overrun"  122.0s on level  $533  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r2/l3 detonator r3/l4 bulwark r2/l3 wasp r3/l4 scatterGun r3/l4 stormcaller r2/l3 carrier r1/l2]  death 1/10
- 875.0s  --- LEVEL 13 level-13 "Deadlock"  start $533  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r2/l3 detonator r3/l4 bulwark r2/l3 wasp r3/l4 scatterGun r3/l4 stormcaller r2/l3 carrier r1/l2]
- 892.1s  BUY rate   wasp           $960  (now r4/l4, $4 left)
- 907.2s  BUY level  wasp           $960  (now r4/l5, $19 left)
- 908.1s  WIN level-13 "Deadlock"  33.0s on level  $443  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r2/l3 detonator r3/l4 bulwark r2/l3 wasp r4/l5 scatterGun r3/l4 stormcaller r2/l3 carrier r1/l2]
- 908.1s  --- LEVEL 14 level-14 "Overrun"  start $443  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r2/l3 detonator r3/l4 bulwark r2/l3 wasp r4/l5 scatterGun r3/l4 stormcaller r2/l3 carrier r1/l2]
- 929.7s  BUY rate   carrier        $1100  (now r2/l2, $1 left)
- 954.9s  BUY level  carrier        $1100  (now r2/l3, $2 left)
- 982.4s  BUY rate   railgunLancer  $1120  (now r3/l3, $7 left)
-1014.5s  BUY level  railgunLancer  $1120  (now r3/l4, $0 left)
-1043.3s  BUY rate   bulwark        $1200  (now r3/l3, $0 left)
-1062.7s  DIE level-14 "Overrun"  154.7s on level  $932  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r3/l4 detonator r3/l4 bulwark r3/l3 wasp r4/l5 scatterGun r3/l4 stormcaller r2/l3 carrier r2/l3]  death 2/10
-1062.7s  --- LEVEL 13 level-13 "Deadlock"  start $932  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r3/l4 detonator r3/l4 bulwark r3/l3 wasp r4/l5 scatterGun r3/l4 stormcaller r2/l3 carrier r2/l3]
-1074.6s  BUY level  bulwark        $1200  (now r3/l4, $2 left)
-1084.2s  WIN level-13 "Deadlock"  21.5s on level  $1050  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r3/l4 detonator r3/l4 bulwark r3/l4 wasp r4/l5 scatterGun r3/l4 stormcaller r2/l3 carrier r2/l3]
-1084.2s  --- LEVEL 14 level-14 "Overrun"  start $1050  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r3/l4 detonator r3/l4 bulwark r3/l4 wasp r4/l5 scatterGun r3/l4 stormcaller r2/l3 carrier r2/l3]
-1097.7s  BUY rate   skiff          $1280  (now r9/l9, $1 left)
-1123.9s  BUY level  skiff          $1280  (now r9/l10, $1 left)
-1148.4s  BUY rate   gunner         $1280  (now r6/l6, $1 left)
-1171.0s  BUY level  gunner         $1280  (now r6/l7, $1 left)
-1187.6s  BUY rate   missileFrigate $1280  (now r4/l4, $7 left)
-1206.9s  BUY level  missileFrigate $1280  (now r4/l5, $0 left)
-1220.2s  BUY rate   stormcaller    $1440  (now r3/l3, $155 left)
-1220.3s  WIN level-14 "Overrun"  136.1s on level  $649  [skiff r9/l10 gunner r6/l7 missileFrigate r4/l5 railgunLancer r3/l4 detonator r3/l4 bulwark r3/l4 wasp r4/l5 scatterGun r3/l4 stormcaller r3/l3 carrier r2/l3]
-1220.3s  --- LEVEL 15 level-15 "Armada"  start $649  [skiff r9/l10 gunner r6/l7 missileFrigate r4/l5 railgunLancer r3/l4 detonator r3/l4 bulwark r3/l4 wasp r4/l5 scatterGun r3/l4 stormcaller r3/l3 carrier r2/l3]
-1239.3s  BUY level  stormcaller    $1440  (now r3/l4, $3 left)
-1253.1s  BUY rate   scatterGun     $1520  (now r4/l4, $1 left)
-1264.3s  BUY level  scatterGun     $1520  (now r4/l5, $3 left)
-1267.6s  WIN level-15 "Armada"  47.3s on level  $1192  [skiff r9/l10 gunner r6/l7 missileFrigate r4/l5 railgunLancer r3/l4 detonator r3/l4 bulwark r3/l4 wasp r4/l5 scatterGun r4/l5 stormcaller r3/l4 carrier r2/l3]
-1267.6s  --- LEVEL 16 level-16 "Event Horizon"  start $1192  [skiff r9/l10 gunner r6/l7 missileFrigate r4/l5 railgunLancer r3/l4 detonator r3/l4 bulwark r3/l4 wasp r4/l5 scatterGun r4/l5 stormcaller r3/l4 carrier r2/l3]
-1283.8s  BUY rate   detonator      $1760  (now r4/l4, $5 left)
-1301.3s  BUY level  detonator      $1760  (now r4/l5, $2 left)
-1317.1s  BUY rate   wasp           $1920  (now r5/l5, $1 left)
-1331.2s  BUY level  wasp           $1920  (now r5/l6, $0 left)
-1347.4s  BUY rate   carrier        $2200  (now r3/l3, $7 left)
-1364.0s  BUY level  carrier        $2200  (now r3/l4, $6 left)
-1378.9s  BUY rate   railgunLancer  $2240  (now r4/l4, $4 left)
-1392.6s  BUY level  railgunLancer  $2240  (now r4/l5, $2 left)
-1406.2s  BUY rate   bulwark        $2400  (now r4/l4, $7 left)
-1421.0s  BUY level  bulwark        $2400  (now r4/l5, $4 left)
-1435.4s  BUY rate   skiff          $2560  (now r10/l10, $2 left)
-1450.6s  BUY level  skiff          $2560  (now r10/l11, $11 left)
-1462.5s  BUY rate   gunner         $2560  (now r7/l7, $326 left)
-1476.8s  BUY level  gunner         $2560  (now r7/l8, $12 left)
-1491.0s  BUY rate   missileFrigate $2560  (now r5/l5, $1 left)
-1506.7s  BUY level  missileFrigate $2560  (now r5/l6, $6 left)
-1522.8s  BUY rate   stormcaller    $2880  (now r4/l4, $7 left)
-1539.2s  BUY level  stormcaller    $2880  (now r4/l5, $0 left)
-1557.0s  BUY rate   scatterGun     $3040  (now r5/l5, $2379 left)
-1557.4s  WIN level-16 "Event Horizon"  289.7s on level  $2835  [skiff r10/l11 gunner r7/l8 missileFrigate r5/l6 railgunLancer r4/l5 detonator r4/l5 bulwark r4/l5 wasp r5/l6 scatterGun r5/l5 stormcaller r4/l5 carrier r3/l4]
-1557.4s  END cleared every level - campaign complete.
+  18.7s  WIN level-1 "First Contact"  18.7s on level  $3  [skiff r2/l2]
+  18.7s  --- LEVEL 2 level-2 "Escalation"  start $3  [skiff r2/l2]
+  26.2s  BUY level  skiff          $10  (now r2/l3, $0 left)
+  36.7s  BUY rate   skiff          $20  (now r3/l3, $0 left)
+  39.9s  BUY level  skiff          $20  (now r3/l4, $0 left)
+  48.9s  WIN level-2 "Escalation"  30.2s on level  $43  [skiff r3/l4]
+  48.9s  --- LEVEL 3 level-3 "Probe"  start $43  [skiff r3/l4]
+  48.9s  BUY rate   skiff          $40  (now r4/l4, $3 left)
+  66.3s  BUY level  skiff          $40  (now r4/l5, $1 left)
+  72.7s  BUY unlock gunner         $40  (now r1/l1, $0 left)
+  78.9s  WIN level-3 "Probe"  30.0s on level  $43  [skiff r4/l5 gunner r1/l1]
+  78.9s  --- LEVEL 4 level-4 "Vanguard"  start $43  [skiff r4/l5 gunner r1/l1]
+  78.9s  BUY level  gunner         $40  (now r1/l2, $3 left)
+  91.1s  WIN level-4 "Vanguard"  12.1s on level  $75  [skiff r4/l5 gunner r1/l2]
+  91.1s  --- LEVEL 5 level-5 "Escort"  start $75  [skiff r4/l5 gunner r1/l2]
+  95.3s  BUY rate   skiff          $80  (now r5/l5, $0 left)
+ 107.1s  BUY level  skiff          $80  (now r5/l6, $3 left)
+ 114.8s  BUY rate   gunner         $80  (now r2/l2, $0 left)
+ 115.8s  WIN level-5 "Escort"  24.7s on level  $56  [skiff r5/l6 gunner r2/l2]
+ 115.8s  --- LEVEL 6 level-6 "Crossfire"  start $56  [skiff r5/l6 gunner r2/l2]
+ 123.0s  BUY level  gunner         $80  (now r2/l3, $0 left)
+ 135.3s  BUY unlock wasp           $120  (now r1/l1, $0 left)
+ 135.9s  WIN level-6 "Crossfire"  20.0s on level  $36  [skiff r5/l6 gunner r2/l3 wasp r1/l1]
+ 135.9s  --- LEVEL 7 level-7 "Bastion"  start $36  [skiff r5/l6 gunner r2/l3 wasp r1/l1]
+ 145.4s  BUY level  wasp           $120  (now r1/l2, $0 left)
+ 157.3s  DIE level-7 "Bastion"  21.4s on level  $130  [skiff r5/l6 gunner r2/l3 wasp r1/l2]  death 1/10
+ 157.3s  --- LEVEL 6 level-6 "Crossfire"  start $130  [skiff r5/l6 gunner r2/l3 wasp r1/l2]
+ 164.5s  BUY rate   skiff          $160  (now r6/l6, $0 left)
+ 170.3s  WIN level-6 "Crossfire"  13.0s on level  $87  [skiff r6/l6 gunner r2/l3 wasp r1/l2]
+ 170.3s  --- LEVEL 7 level-7 "Bastion"  start $87  [skiff r6/l6 gunner r2/l3 wasp r1/l2]
+ 181.1s  BUY level  skiff          $160  (now r6/l7, $0 left)
+ 194.3s  BUY rate   gunner         $160  (now r3/l3, $0 left)
+ 195.6s  DIE level-7 "Bastion"  25.4s on level  $26  [skiff r6/l7 gunner r3/l3 wasp r1/l2]  death 2/10
+ 195.6s  --- LEVEL 6 level-6 "Crossfire"  start $26  [skiff r6/l7 gunner r3/l3 wasp r1/l2]
+ 208.4s  WIN level-6 "Crossfire"  12.8s on level  $144  [skiff r6/l7 gunner r3/l3 wasp r1/l2]
+ 208.4s  --- LEVEL 7 level-7 "Bastion"  start $144  [skiff r6/l7 gunner r3/l3 wasp r1/l2]
+ 212.6s  BUY level  gunner         $160  (now r3/l4, $0 left)
+ 222.3s  BUY unlock missileFrigate $160  (now r1/l1, $0 left)
+ 230.6s  BUY level  missileFrigate $160  (now r1/l2, $2 left)
+ 237.2s  WIN level-7 "Bastion"  28.8s on level  $160  [skiff r6/l7 gunner r3/l4 missileFrigate r1/l2 wasp r1/l2]
+ 237.2s  --- LEVEL 8 level-8 "Pincer"  start $160  [skiff r6/l7 gunner r3/l4 missileFrigate r1/l2 wasp r1/l2]
+ 242.9s  BUY unlock scatterGun     $190  (now r1/l1, $0 left)
+ 252.6s  BUY level  scatterGun     $190  (now r1/l2, $0 left)
+ 260.4s  DIE level-8 "Pincer"  23.2s on level  $126  [skiff r6/l7 gunner r3/l4 missileFrigate r1/l2 wasp r1/l2 scatterGun r1/l2]  death 1/10
+ 260.4s  --- LEVEL 7 level-7 "Bastion"  start $126  [skiff r6/l7 gunner r3/l4 missileFrigate r1/l2 wasp r1/l2 scatterGun r1/l2]
+ 270.0s  BUY unlock detonator      $220  (now r1/l1, $3 left)
+ 280.4s  BUY level  detonator      $220  (now r1/l2, $3 left)
+ 283.0s  WIN level-7 "Bastion"  22.6s on level  $104  [skiff r6/l7 gunner r3/l4 missileFrigate r1/l2 detonator r1/l2 wasp r1/l2 scatterGun r1/l2]
+ 283.0s  --- LEVEL 8 level-8 "Pincer"  start $104  [skiff r6/l7 gunner r3/l4 missileFrigate r1/l2 detonator r1/l2 wasp r1/l2 scatterGun r1/l2]
+ 293.6s  BUY rate   wasp           $240  (now r2/l2, $1 left)
+ 305.9s  BUY level  wasp           $240  (now r2/l3, $3 left)
+ 313.7s  DIE level-8 "Pincer"  30.7s on level  $142  [skiff r6/l7 gunner r3/l4 missileFrigate r1/l2 detonator r1/l2 wasp r2/l3 scatterGun r1/l2]  death 2/10
+ 313.7s  --- LEVEL 7 level-7 "Bastion"  start $142  [skiff r6/l7 gunner r3/l4 missileFrigate r1/l2 detonator r1/l2 wasp r2/l3 scatterGun r1/l2]
+ 323.4s  BUY unlock railgunLancer  $280  (now r1/l1, $0 left)
+ 325.9s  WIN level-7 "Bastion"  12.2s on level  $93  [skiff r6/l7 gunner r3/l4 missileFrigate r1/l2 railgunLancer r1/l1 detonator r1/l2 wasp r2/l3 scatterGun r1/l2]
+ 325.9s  --- LEVEL 8 level-8 "Pincer"  start $93  [skiff r6/l7 gunner r3/l4 missileFrigate r1/l2 railgunLancer r1/l1 detonator r1/l2 wasp r2/l3 scatterGun r1/l2]
+ 338.3s  BUY level  railgunLancer  $280  (now r1/l2, $1 left)
+ 353.8s  BUY unlock bulwark        $300  (now r1/l1, $2 left)
+ 364.6s  DIE level-8 "Pincer"  38.8s on level  $273  [skiff r6/l7 gunner r3/l4 missileFrigate r1/l2 railgunLancer r1/l2 detonator r1/l2 bulwark r1/l1 wasp r2/l3 scatterGun r1/l2]  death 3/10
+ 364.6s  --- LEVEL 7 level-7 "Bastion"  start $273  [skiff r6/l7 gunner r3/l4 missileFrigate r1/l2 railgunLancer r1/l2 detonator r1/l2 bulwark r1/l1 wasp r2/l3 scatterGun r1/l2]
+ 370.0s  BUY level  bulwark        $300  (now r1/l2, $5 left)
+ 380.1s  WIN level-7 "Bastion"  15.4s on level  $261  [skiff r6/l7 gunner r3/l4 missileFrigate r1/l2 railgunLancer r1/l2 detonator r1/l2 bulwark r1/l2 wasp r2/l3 scatterGun r1/l2]
+ 380.1s  --- LEVEL 8 level-8 "Pincer"  start $261  [skiff r6/l7 gunner r3/l4 missileFrigate r1/l2 railgunLancer r1/l2 detonator r1/l2 bulwark r1/l2 wasp r2/l3 scatterGun r1/l2]
+ 386.8s  BUY rate   skiff          $320  (now r7/l7, $2 left)
+ 402.0s  BUY level  skiff          $320  (now r7/l8, $0 left)
+ 415.7s  BUY rate   gunner         $320  (now r4/l4, $1 left)
+ 429.9s  BUY level  gunner         $320  (now r4/l5, $6 left)
+ 430.5s  DIE level-8 "Pincer"  50.4s on level  $21  [skiff r7/l8 gunner r4/l5 missileFrigate r1/l2 railgunLancer r1/l2 detonator r1/l2 bulwark r1/l2 wasp r2/l3 scatterGun r1/l2]  death 4/10
+ 430.5s  --- LEVEL 7 level-7 "Bastion"  start $21  [skiff r7/l8 gunner r4/l5 missileFrigate r1/l2 railgunLancer r1/l2 detonator r1/l2 bulwark r1/l2 wasp r2/l3 scatterGun r1/l2]
+ 442.5s  WIN level-7 "Bastion"  12.0s on level  $237  [skiff r7/l8 gunner r4/l5 missileFrigate r1/l2 railgunLancer r1/l2 detonator r1/l2 bulwark r1/l2 wasp r2/l3 scatterGun r1/l2]
+ 442.5s  --- LEVEL 8 level-8 "Pincer"  start $237  [skiff r7/l8 gunner r4/l5 missileFrigate r1/l2 railgunLancer r1/l2 detonator r1/l2 bulwark r1/l2 wasp r2/l3 scatterGun r1/l2]
+ 450.4s  BUY rate   missileFrigate $320  (now r2/l2, $0 left)
+ 462.1s  BUY level  missileFrigate $320  (now r2/l3, $1 left)
+ 472.5s  WIN level-8 "Pincer"  30.0s on level  $320  [skiff r7/l8 gunner r4/l5 missileFrigate r2/l3 railgunLancer r1/l2 detonator r1/l2 bulwark r1/l2 wasp r2/l3 scatterGun r1/l2]
+ 472.5s  --- LEVEL 9 level-9 "Onset"  start $320  [skiff r7/l8 gunner r4/l5 missileFrigate r2/l3 railgunLancer r1/l2 detonator r1/l2 bulwark r1/l2 wasp r2/l3 scatterGun r1/l2]
+ 477.8s  BUY unlock stormcaller    $360  (now r1/l1, $3 left)
+ 489.1s  BUY level  stormcaller    $360  (now r1/l2, $0 left)
+ 500.9s  BUY rate   scatterGun     $380  (now r2/l2, $2 left)
+ 510.0s  BUY level  scatterGun     $380  (now r2/l3, $6 left)
+ 511.8s  DIE level-9 "Onset"  39.3s on level  $77  [skiff r7/l8 gunner r4/l5 missileFrigate r2/l3 railgunLancer r1/l2 detonator r1/l2 bulwark r1/l2 wasp r2/l3 scatterGun r2/l3 stormcaller r1/l2]  death 1/10
+ 511.8s  --- LEVEL 8 level-8 "Pincer"  start $77  [skiff r7/l8 gunner r4/l5 missileFrigate r2/l3 railgunLancer r1/l2 detonator r1/l2 bulwark r1/l2 wasp r2/l3 scatterGun r2/l3 stormcaller r1/l2]
+ 530.0s  BUY rate   detonator      $440  (now r2/l2, $0 left)
+ 537.5s  WIN level-8 "Pincer"  25.7s on level  $246  [skiff r7/l8 gunner r4/l5 missileFrigate r2/l3 railgunLancer r1/l2 detonator r2/l2 bulwark r1/l2 wasp r2/l3 scatterGun r2/l3 stormcaller r1/l2]
+ 537.5s  --- LEVEL 9 level-9 "Onset"  start $246  [skiff r7/l8 gunner r4/l5 missileFrigate r2/l3 railgunLancer r1/l2 detonator r2/l2 bulwark r1/l2 wasp r2/l3 scatterGun r2/l3 stormcaller r1/l2]
+ 547.1s  BUY level  detonator      $440  (now r2/l3, $2 left)
+ 560.7s  BUY rate   wasp           $480  (now r3/l3, $0 left)
+ 573.3s  BUY level  wasp           $480  (now r3/l4, $2 left)
+ 586.5s  BUY unlock carrier        $550  (now r1/l1, $3 left)
+ 596.6s  WIN level-9 "Onset"  59.1s on level  $440  [skiff r7/l8 gunner r4/l5 missileFrigate r2/l3 railgunLancer r1/l2 detonator r2/l3 bulwark r1/l2 wasp r3/l4 scatterGun r2/l3 stormcaller r1/l2 carrier r1/l1]
+ 596.6s  --- LEVEL 10 level-10 "Rampart"  start $440  [skiff r7/l8 gunner r4/l5 missileFrigate r2/l3 railgunLancer r1/l2 detonator r2/l3 bulwark r1/l2 wasp r3/l4 scatterGun r2/l3 stormcaller r1/l2 carrier r1/l1]
+ 605.9s  BUY level  carrier        $550  (now r1/l2, $0 left)
+ 619.6s  BUY rate   railgunLancer  $560  (now r2/l2, $1 left)
+ 622.7s  WIN level-10 "Rampart"  26.1s on level  $211  [skiff r7/l8 gunner r4/l5 missileFrigate r2/l3 railgunLancer r2/l2 detonator r2/l3 bulwark r1/l2 wasp r3/l4 scatterGun r2/l3 stormcaller r1/l2 carrier r1/l2]
+ 622.7s  --- LEVEL 11 level-11 "Siege"  start $211  [skiff r7/l8 gunner r4/l5 missileFrigate r2/l3 railgunLancer r2/l2 detonator r2/l3 bulwark r1/l2 wasp r3/l4 scatterGun r2/l3 stormcaller r1/l2 carrier r1/l2]
+ 637.3s  BUY level  railgunLancer  $560  (now r2/l3, $0 left)
+ 648.5s  WIN level-11 "Siege"  25.8s on level  $683  [skiff r7/l8 gunner r4/l5 missileFrigate r2/l3 railgunLancer r2/l3 detonator r2/l3 bulwark r1/l2 wasp r3/l4 scatterGun r2/l3 stormcaller r1/l2 carrier r1/l2]
+ 648.5s  --- LEVEL 12 level-12 "Redoubt"  start $683  [skiff r7/l8 gunner r4/l5 missileFrigate r2/l3 railgunLancer r2/l3 detonator r2/l3 bulwark r1/l2 wasp r3/l4 scatterGun r2/l3 stormcaller r1/l2 carrier r1/l2]
+ 648.5s  BUY rate   bulwark        $600  (now r2/l2, $83 left)
+ 666.1s  BUY level  bulwark        $600  (now r2/l3, $5 left)
+ 678.9s  BUY rate   skiff          $640  (now r8/l8, $5 left)
+ 688.2s  BUY level  skiff          $640  (now r8/l9, $4 left)
+ 691.9s  WIN level-12 "Redoubt"  43.4s on level  $447  [skiff r8/l9 gunner r4/l5 missileFrigate r2/l3 railgunLancer r2/l3 detonator r2/l3 bulwark r2/l3 wasp r3/l4 scatterGun r2/l3 stormcaller r1/l2 carrier r1/l2]
+ 691.9s  --- LEVEL 13 level-13 "Deadlock"  start $447  [skiff r8/l9 gunner r4/l5 missileFrigate r2/l3 railgunLancer r2/l3 detonator r2/l3 bulwark r2/l3 wasp r3/l4 scatterGun r2/l3 stormcaller r1/l2 carrier r1/l2]
+ 702.0s  BUY rate   gunner         $640  (now r5/l5, $2 left)
+ 714.8s  BUY level  gunner         $640  (now r5/l6, $0 left)
+ 726.4s  BUY rate   missileFrigate $640  (now r3/l3, $5 left)
+ 736.7s  BUY level  missileFrigate $640  (now r3/l4, $3 left)
+ 746.7s  BUY rate   stormcaller    $720  (now r2/l2, $2 left)
+ 751.5s  WIN level-13 "Deadlock"  59.5s on level  $529  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r2/l3 detonator r2/l3 bulwark r2/l3 wasp r3/l4 scatterGun r2/l3 stormcaller r2/l2 carrier r1/l2]
+ 751.5s  --- LEVEL 14 level-14 "Overrun"  start $529  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r2/l3 detonator r2/l3 bulwark r2/l3 wasp r3/l4 scatterGun r2/l3 stormcaller r2/l2 carrier r1/l2]
+ 761.3s  BUY level  stormcaller    $720  (now r2/l3, $3 left)
+ 777.4s  BUY rate   scatterGun     $760  (now r3/l3, $2 left)
+ 792.6s  BUY level  scatterGun     $760  (now r3/l4, $3 left)
+ 801.9s  DIE level-14 "Overrun"  50.5s on level  $533  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r2/l3 detonator r2/l3 bulwark r2/l3 wasp r3/l4 scatterGun r3/l4 stormcaller r2/l3 carrier r1/l2]  death 1/10
+ 801.9s  --- LEVEL 13 level-13 "Deadlock"  start $533  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r2/l3 detonator r2/l3 bulwark r2/l3 wasp r3/l4 scatterGun r3/l4 stormcaller r2/l3 carrier r1/l2]
+ 815.4s  BUY rate   detonator      $880  (now r3/l3, $9 left)
+ 827.5s  BUY level  detonator      $880  (now r3/l4, $9 left)
+ 830.8s  WIN level-13 "Deadlock"  28.9s on level  $335  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r2/l3 detonator r3/l4 bulwark r2/l3 wasp r3/l4 scatterGun r3/l4 stormcaller r2/l3 carrier r1/l2]
+ 830.8s  --- LEVEL 14 level-14 "Overrun"  start $335  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r2/l3 detonator r3/l4 bulwark r2/l3 wasp r3/l4 scatterGun r3/l4 stormcaller r2/l3 carrier r1/l2]
+ 849.3s  BUY rate   wasp           $960  (now r4/l4, $3 left)
+ 869.2s  BUY level  wasp           $960  (now r4/l5, $5 left)
+ 890.5s  BUY rate   carrier        $1100  (now r2/l2, $2 left)
+ 893.2s  DIE level-14 "Overrun"  62.4s on level  $164  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r2/l3 detonator r3/l4 bulwark r2/l3 wasp r4/l5 scatterGun r3/l4 stormcaller r2/l3 carrier r2/l2]  death 2/10
+ 893.2s  --- LEVEL 13 level-13 "Deadlock"  start $164  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r2/l3 detonator r3/l4 bulwark r2/l3 wasp r4/l5 scatterGun r3/l4 stormcaller r2/l3 carrier r2/l2]
+ 913.7s  BUY level  carrier        $1100  (now r2/l3, $25 left)
+ 915.6s  WIN level-13 "Deadlock"  22.4s on level  $304  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r2/l3 detonator r3/l4 bulwark r2/l3 wasp r4/l5 scatterGun r3/l4 stormcaller r2/l3 carrier r2/l3]
+ 915.6s  --- LEVEL 14 level-14 "Overrun"  start $304  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r2/l3 detonator r3/l4 bulwark r2/l3 wasp r4/l5 scatterGun r3/l4 stormcaller r2/l3 carrier r2/l3]
+ 939.6s  BUY rate   railgunLancer  $1120  (now r3/l3, $0 left)
+ 962.9s  BUY level  railgunLancer  $1120  (now r3/l4, $3 left)
+ 981.6s  BUY rate   bulwark        $1200  (now r3/l3, $12 left)
+ 995.3s  DIE level-14 "Overrun"  79.7s on level  $830  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r3/l4 detonator r3/l4 bulwark r3/l3 wasp r4/l5 scatterGun r3/l4 stormcaller r2/l3 carrier r2/l3]  death 3/10
+ 995.3s  --- LEVEL 13 level-13 "Deadlock"  start $830  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r3/l4 detonator r3/l4 bulwark r3/l3 wasp r4/l5 scatterGun r3/l4 stormcaller r2/l3 carrier r2/l3]
+1007.2s  BUY level  bulwark        $1200  (now r3/l4, $1 left)
+1019.0s  WIN level-13 "Deadlock"  23.7s on level  $929  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r3/l4 detonator r3/l4 bulwark r3/l4 wasp r4/l5 scatterGun r3/l4 stormcaller r2/l3 carrier r2/l3]
+1019.0s  --- LEVEL 14 level-14 "Overrun"  start $929  [skiff r8/l9 gunner r5/l6 missileFrigate r3/l4 railgunLancer r3/l4 detonator r3/l4 bulwark r3/l4 wasp r4/l5 scatterGun r3/l4 stormcaller r2/l3 carrier r2/l3]
+1030.8s  BUY rate   skiff          $1280  (now r9/l9, $1 left)
+1055.3s  BUY level  skiff          $1280  (now r9/l10, $0 left)
+1075.7s  BUY rate   gunner         $1280  (now r6/l6, $5 left)
+1091.5s  BUY level  gunner         $1280  (now r6/l7, $1 left)
+1102.7s  BUY rate   missileFrigate $1280  (now r4/l4, $1 left)
+1104.6s  WIN level-14 "Overrun"  85.6s on level  $204  [skiff r9/l10 gunner r6/l7 missileFrigate r4/l4 railgunLancer r3/l4 detonator r3/l4 bulwark r3/l4 wasp r4/l5 scatterGun r3/l4 stormcaller r2/l3 carrier r2/l3]
+1104.6s  --- LEVEL 15 level-15 "Armada"  start $204  [skiff r9/l10 gunner r6/l7 missileFrigate r4/l4 railgunLancer r3/l4 detonator r3/l4 bulwark r3/l4 wasp r4/l5 scatterGun r3/l4 stormcaller r2/l3 carrier r2/l3]
+1124.4s  BUY level  missileFrigate $1280  (now r4/l5, $3 left)
+1136.0s  BUY rate   stormcaller    $1440  (now r3/l3, $10 left)
+1148.1s  BUY level  stormcaller    $1440  (now r3/l4, $2 left)
+1157.7s  BUY rate   scatterGun     $1520  (now r4/l4, $11 left)
+1165.9s  BUY level  scatterGun     $1520  (now r4/l5, $53 left)
+1167.8s  WIN level-15 "Armada"  63.1s on level  $652  [skiff r9/l10 gunner r6/l7 missileFrigate r4/l5 railgunLancer r3/l4 detonator r3/l4 bulwark r3/l4 wasp r4/l5 scatterGun r4/l5 stormcaller r3/l4 carrier r2/l3]
+1167.8s  --- LEVEL 16 level-16 "Event Horizon"  start $652  [skiff r9/l10 gunner r6/l7 missileFrigate r4/l5 railgunLancer r3/l4 detonator r3/l4 bulwark r3/l4 wasp r4/l5 scatterGun r4/l5 stormcaller r3/l4 carrier r2/l3]
+1186.6s  BUY rate   detonator      $1760  (now r4/l4, $1 left)
+1202.4s  BUY level  detonator      $1760  (now r4/l5, $12 left)
+1215.6s  BUY rate   wasp           $1920  (now r5/l5, $6 left)
+1227.6s  BUY level  wasp           $1920  (now r5/l6, $11 left)
+1240.8s  BUY rate   carrier        $2200  (now r3/l3, $6 left)
+1253.3s  BUY level  carrier        $2200  (now r3/l4, $17 left)
+1263.7s  BUY rate   railgunLancer  $2240  (now r4/l4, $0 left)
+1267.8s  DIE level-16 "Event Horizon"  100.1s on level  $958  [skiff r9/l10 gunner r6/l7 missileFrigate r4/l5 railgunLancer r4/l4 detonator r4/l5 bulwark r3/l4 wasp r5/l6 scatterGun r4/l5 stormcaller r3/l4 carrier r3/l4]  death 1/10
+1267.8s  --- LEVEL 15 level-15 "Armada"  start $958  [skiff r9/l10 gunner r6/l7 missileFrigate r4/l5 railgunLancer r4/l4 detonator r4/l5 bulwark r3/l4 wasp r5/l6 scatterGun r4/l5 stormcaller r3/l4 carrier r3/l4]
+1287.0s  BUY level  railgunLancer  $2240  (now r4/l5, $13 left)
+1299.7s  WIN level-15 "Armada"  31.9s on level  $2104  [skiff r9/l10 gunner r6/l7 missileFrigate r4/l5 railgunLancer r4/l5 detonator r4/l5 bulwark r3/l4 wasp r5/l6 scatterGun r4/l5 stormcaller r3/l4 carrier r3/l4]
+1299.7s  --- LEVEL 16 level-16 "Event Horizon"  start $2104  [skiff r9/l10 gunner r6/l7 missileFrigate r4/l5 railgunLancer r4/l5 detonator r4/l5 bulwark r3/l4 wasp r5/l6 scatterGun r4/l5 stormcaller r3/l4 carrier r3/l4]
+1309.7s  BUY rate   bulwark        $2400  (now r4/l4, $5 left)
+1330.8s  BUY level  bulwark        $2400  (now r4/l5, $1 left)
+1348.5s  BUY rate   skiff          $2560  (now r10/l10, $5 left)
+1361.6s  BUY level  skiff          $2560  (now r10/l11, $23 left)
+1365.5s  WIN level-16 "Event Horizon"  65.8s on level  $1236  [skiff r10/l11 gunner r6/l7 missileFrigate r4/l5 railgunLancer r4/l5 detonator r4/l5 bulwark r4/l5 wasp r5/l6 scatterGun r4/l5 stormcaller r3/l4 carrier r3/l4]
+1365.5s  END cleared every level - campaign complete.

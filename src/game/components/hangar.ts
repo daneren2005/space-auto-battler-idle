@@ -12,6 +12,10 @@ import { SHIP_TYPES, SHIP_TYPE_INDEX, SHIP_TYPE_COUNT, type ShipType } from '@/d
 //
 // rateBought / levelBought are touched only by the main thread, so plain reads/writes are safe.
 // No save(): spawn progress isn't worth persisting and bought counts ride the separate Carry record.
+//
+// Two trailing station-wide scalars carry the player's prestige multipliers (see ascendancy.ts): the main thread
+// stamps them at load, the spawn worker reads them to scale this station's ships/second (Doctrine) and stamped
+// damage (Munitions). Stored fixed-point (x1000, 1000 = no bonus); non-player stations keep the default.
 
 // Five sections of SHIP_TYPE_COUNT: rates, levels, progress, rateBought, levelBought.
 export function hangarRateIndex(typeIndex: number): number {
@@ -32,6 +36,11 @@ export function hangarLevelBoughtIndex(typeIndex: number): number {
 
 const HANGAR_SECTIONS = 5;
 
+export const HANGAR_RATE_MULT = HANGAR_SECTIONS * SHIP_TYPE_COUNT;
+export const HANGAR_DAMAGE_MULT = HANGAR_SECTIONS * SHIP_TYPE_COUNT + 1;
+export const HANGAR_MULT_SCALE = 1000;
+const HANGAR_SIZE = HANGAR_SECTIONS * SHIP_TYPE_COUNT + 2;
+
 export interface HangarShipConfig {
 	rate?: number
 	level?: number
@@ -48,15 +57,19 @@ export interface HangarComponent {
 	level(typeIndex: number): number
 	rateBought(typeIndex: number): number
 	levelBought(typeIndex: number): number
+	rateMultiplier: number
+	damageMultiplier: number
 }
 
 export const hangarDefinition: ComponentDefinition<HangarComponent, Int32Array, HangarConfig> = {
 	type: Int32Array,
-	size: HANGAR_SECTIONS * SHIP_TYPE_COUNT,
+	size: HANGAR_SIZE,
 	// Only a station carries a hangar, and a station is the one entity built with a `color`.
 	loadProperties: ['color'],
 	load(entity, memory, config) {
-		const values = Array.from({ length: HANGAR_SECTIONS * SHIP_TYPE_COUNT }, () => 0);
+		const values = Array.from({ length: HANGAR_SIZE }, () => 0);
+		values[HANGAR_RATE_MULT] = HANGAR_MULT_SCALE;
+		values[HANGAR_DAMAGE_MULT] = HANGAR_MULT_SCALE;
 		if(config.ships) {
 			for(const type of SHIP_TYPES) {
 				const ship = config.ships[type];
@@ -85,6 +98,18 @@ export const hangarDefinition: ComponentDefinition<HangarComponent, Int32Array, 
 			},
 			levelBought(typeIndex: number) {
 				return block[hangarLevelBoughtIndex(typeIndex)];
+			},
+			get rateMultiplier() {
+				return block[HANGAR_RATE_MULT] / HANGAR_MULT_SCALE;
+			},
+			set rateMultiplier(value: number) {
+				block[HANGAR_RATE_MULT] = Math.round(value * HANGAR_MULT_SCALE);
+			},
+			get damageMultiplier() {
+				return block[HANGAR_DAMAGE_MULT] / HANGAR_MULT_SCALE;
+			},
+			set damageMultiplier(value: number) {
+				block[HANGAR_DAMAGE_MULT] = Math.round(value * HANGAR_MULT_SCALE);
 			},
 		};
 	},

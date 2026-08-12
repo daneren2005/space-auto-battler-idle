@@ -5,6 +5,8 @@ import type ShipRoster from './ship-roster';
 import formatStats from './format-stats';
 import { HUD_TOP_HEIGHT, HUD_BOTTOM_HEIGHT } from './display';
 import { SHIP_TYPES, SHIP_TYPE_DEFS, combatStat, nextLevelSummary, type ShipType } from '@/data/ship-types';
+import { ASCENDANCY_NODES, ASCENDANCY_NODE_DEFS, nodeLevel, type AscendancyNodeId } from '@/data/ascendancy';
+import { nodeCost, nodeAvailable, nodeMaxed } from '@/data/meta';
 
 // snowb.org bitmap font; all HUD text is drawn with it, tinted per-use via setTintFill. Export at ~100px with
 // a few px glyph spacing - large + tight packing makes small labels downscale into a grey haze.
@@ -50,9 +52,30 @@ const DANGER_TINT = 0xff8a8a;
 // Pause menu geometry; the square pause button sits in the top-right of the top HUD band, its modal panel is centred.
 const PAUSE_BUTTON_SIZE = 52;
 const PAUSE_PANEL_WIDTH = 520;
-const PAUSE_PANEL_HEIGHT = 560;
+const PAUSE_PANEL_HEIGHT = 620;
 const PAUSE_MENU_BUTTON_WIDTH = 300;
 const PAUSE_MENU_BUTTON_HEIGHT = 64;
+// Vertical pitch when the pause menu stacks its (dynamically shown) buttons.
+const PAUSE_MENU_BUTTON_PITCH = 84;
+
+// Purple used for Dark Matter + the prestige controls.
+const DARK_MATTER_TINT = 0xc39bff;
+
+// The Ascendancy tree modal; offsets measured from the panel's centre. The window art has a nameplate oval up top
+// and an inset frame border, so the heading sits in the oval and the rows/buttons stay pulled in from the edges.
+const ASCENDANCY_PANEL_WIDTH = 680;
+const ASCENDANCY_PANEL_HEIGHT = 900;
+const ASCENDANCY_HEADING_Y = -318;
+const ASCENDANCY_BALANCE_Y = -230;
+const ASCENDANCY_ROWS_Y = -172;
+const ASCENDANCY_ROW_HEIGHT = 92;
+const ASCENDANCY_CLOSE_Y = 372;
+const ASCENDANCY_BUY_WIDTH = 200;
+const ASCENDANCY_BUY_HEIGHT = 56;
+const ASCENDANCY_TEXT_X = -262;
+const ASCENDANCY_BUY_X = 150;
+// Widest a row's label/detail may run before it would reach the buy button.
+const ASCENDANCY_TEXT_MAX_WIDTH = 300;
 
 // Milliseconds before a level-change toast dismisses itself; a tap dismisses it sooner.
 const TOAST_DURATION = 10000;
@@ -110,7 +133,23 @@ export default class UIScene extends Phaser.Scene {
 	private pauseMenu!: Phaser.GameObjects.Container;
 	private pauseMainButtons!: Phaser.GameObjects.Container;
 	private pauseConfirmButtons!: Phaser.GameObjects.Container;
+	private ascendancyButton!: Phaser.GameObjects.Container;
+	private singularityButton!: Phaser.GameObjects.Container;
 	private resetButton!: Phaser.GameObjects.Container;
+	private resumeButton!: Phaser.GameObjects.Container;
+	// The confirm step is generic: whatever staged it sets the warning line + this handler.
+	private confirmWarning!: Phaser.GameObjects.BitmapText;
+	private pendingConfirm: (() => void) | null = null;
+
+	// The Ascendancy modal: Dark Matter balance + one row per node, opened from the pause menu.
+	private ascendancyMenu!: Phaser.GameObjects.Container;
+	private ascendancyBalance!: Phaser.GameObjects.BitmapText;
+	private ascendancyRows = new Map<AscendancyNodeId, {
+		title: Phaser.GameObjects.BitmapText
+		detail: Phaser.GameObjects.BitmapText
+		button: Phaser.GameObjects.Image
+		buttonLabel: Phaser.GameObjects.BitmapText
+	}>();
 
 	constructor() {
 		super('ui');
@@ -144,6 +183,7 @@ export default class UIScene extends Phaser.Scene {
 		this.buildToast(width);
 		this.buildStatsPanel(width);
 		this.buildPauseMenu(width, height);
+		this.buildAscendancyMenu(width, height);
 	}
 
 	update() {
@@ -162,10 +202,15 @@ export default class UIScene extends Phaser.Scene {
 			}
 		}
 
+		if(this.ascendancyMenu.visible) {
+			this.refreshAscendancyMenu();
+		}
+
 		// Once the match is decided, close the overlays so a stray tap can't buy against a gone station.
 		if(this.gameScene.gameState !== 'playing') {
 			this.closeCard();
 			this.closeDrawer();
+			this.closeAscendancyMenu();
 			this.closePauseMenu();
 		}
 
@@ -246,7 +291,7 @@ export default class UIScene extends Phaser.Scene {
 
 	// Draggable only while no overlay is up and the gesture is in the bottom band.
 	private canDragFleetBar(pointer: Phaser.Input.Pointer, height: number): boolean {
-		return !this.card.visible && !this.drawer.visible && !this.pauseMenu.visible
+		return !this.card.visible && !this.drawer.visible && !this.pauseMenu.visible && !this.ascendancyMenu.visible
 			&& pointer.y >= height - HUD_BOTTOM_HEIGHT;
 	}
 
@@ -529,26 +574,33 @@ export default class UIScene extends Phaser.Scene {
 		// Modal dim; interactive so a tap outside the panel is swallowed rather than resuming by accident.
 		const overlay = this.add.rectangle(cx, cy, width, height, 0x03060f, 0.72).setInteractive();
 		const panel = this.add.image(cx, cy, 'ui-window').setDisplaySize(PAUSE_PANEL_WIDTH, PAUSE_PANEL_HEIGHT).setInteractive();
-		const heading = this.add.bitmapText(cx, cy - 200, FONT, 'PAUSED', 34).setOrigin(0.5).setCenterAlign().setTintFill(0xcfe6ff);
+		const heading = this.add.bitmapText(cx, cy - 220, FONT, 'PAUSED', 34).setOrigin(0.5).setCenterAlign().setTintFill(0xcfe6ff);
 
-		// Main state: Reset Progress (destructive, shown only for a real run) above Resume, the primary action, at the bottom.
-		this.resetButton = this.makeMenuButton(cx, cy - 30, 'Reset Progress', 'ui-button', () => this.showPauseConfirm(), DANGER_TINT);
-		const resume = this.makeMenuButton(cx, cy + 90, 'Resume', 'ui-button-green', () => this.closePauseMenu());
-		this.pauseMainButtons = this.add.container(0, 0, [this.resetButton, resume]);
+		// Main state: prestige controls (shown once unlocked) above the destructive reset, with Resume last. The set on
+		// screen varies, so showPauseMain stacks whichever are visible - positions here are placeholders.
+		this.ascendancyButton = this.makeMenuButton(cx, 0, 'The Ascendancy', 'ui-button', () => this.openAscendancyMenu(), DARK_MATTER_TINT);
+		this.singularityButton = this.makeMenuButton(cx, 0, 'Enter the Singularity', 'ui-button', () => this.stageSingularityConfirm(), DARK_MATTER_TINT);
+		this.resetButton = this.makeMenuButton(cx, 0, 'Reset Progress', 'ui-button', () => this.stageResetConfirm(), DANGER_TINT);
+		this.resumeButton = this.makeMenuButton(cx, 0, 'Resume', 'ui-button-green', () => this.closePauseMenu());
+		this.pauseMainButtons = this.add.container(0, 0, [this.ascendancyButton, this.singularityButton, this.resetButton, this.resumeButton]);
 
-		// Confirm state: a warning + the two-step commit (Reset Everything) or back out (Cancel).
-		const warning = this.add.bitmapText(cx, cy - 96, FONT, 'Wipe your entire run and\nrestart from level 1?', 20)
-			.setOrigin(0.5).setCenterAlign().setTintFill(0xff8a8a);
-		const confirm = this.makeMenuButton(cx, cy + 20, 'Reset Everything', 'ui-button', () => this.confirmReset(), DANGER_TINT);
-		const cancel = this.makeMenuButton(cx, cy + 120, 'Cancel', 'ui-button-green', () => this.showPauseMain());
-		this.pauseConfirmButtons = this.add.container(0, 0, [warning, confirm, cancel]).setVisible(false);
+		// Confirm state: a settable warning + the two-step commit (routed to pendingConfirm) or back out (Cancel).
+		this.confirmWarning = this.add.bitmapText(cx, cy - 96, FONT, '', 20)
+			// Kept well inside the inset window frame so long confirm copy doesn't run into the panel edges.
+			.setOrigin(0.5).setCenterAlign().setMaxWidth(PAUSE_PANEL_WIDTH - 160).setTintFill(0xff8a8a);
+		const confirm = this.makeMenuButton(cx, cy + 40, 'Confirm', 'ui-button', () => this.runConfirm(), DANGER_TINT);
+		const cancel = this.makeMenuButton(cx, cy + 140, 'Cancel', 'ui-button-green', () => this.showPauseMain());
+		this.pauseConfirmButtons = this.add.container(0, 0, [this.confirmWarning, confirm, cancel]).setVisible(false);
 
 		this.pauseMenu = this.add.container(0, 0, [overlay, panel, heading, this.pauseMainButtons, this.pauseConfirmButtons])
 			.setDepth(90).setVisible(false);
 
-		// SPACE mirrors the button: toggles the menu (and so the pause) while a match is live.
+		// SPACE mirrors the button: toggles the menu (and so the pause) while a match is live. From the Ascendancy it
+		// steps back to the pause menu first.
 		this.input.keyboard?.on('keydown-SPACE', () => {
-			if(this.pauseMenu.visible) {
+			if(this.ascendancyMenu.visible) {
+				this.closeAscendancyToPause();
+			} else if(this.pauseMenu.visible) {
 				this.closePauseMenu();
 			} else {
 				this.openPauseMenu();
@@ -580,27 +632,152 @@ export default class UIScene extends Phaser.Scene {
 	}
 
 	private closePauseMenu() {
-		if(!this.pauseMenu.visible) {
+		if(!this.pauseMenu.visible && !this.ascendancyMenu.visible) {
 			return;
 		}
+		this.closeAscendancyMenu();
 		this.pauseMenu.setVisible(false);
 		this.gameScene.setPaused(false);
 	}
 
+	// The set of main-menu buttons varies (prestige controls only once unlocked), so pick the visible ones and stack
+	// them, bottom-anchored on Resume, each frame the main state is shown.
 	private showPauseMain() {
+		const prestige = this.gameScene.prestigeUnlocked;
+		this.ascendancyButton.setVisible(prestige);
+		this.singularityButton.setVisible(prestige);
 		this.resetButton.setVisible(this.gameScene.canResetProgress);
+		this.resumeButton.setVisible(true);
+
+		const stack = [this.ascendancyButton, this.singularityButton, this.resetButton, this.resumeButton]
+			.filter(button => button.visible);
+		const cy = this.scale.height / 2;
+		// Resume sits near the panel bottom; the rest stack up from it.
+		const bottomY = cy + 210;
+		stack.forEach((button, i) => button.setY(bottomY - (stack.length - 1 - i) * PAUSE_MENU_BUTTON_PITCH));
+
 		this.pauseMainButtons.setVisible(true);
 		this.pauseConfirmButtons.setVisible(false);
 	}
 
-	private showPauseConfirm() {
+	private stageResetConfirm() {
+		this.stagePauseConfirm('Wipe your entire run and restart from level 1?\nThe Ascendancy is kept.', () => {
+			this.pauseMenu.setVisible(false);
+			this.gameScene.resetProgressToStart();
+		});
+	}
+
+	private stageSingularityConfirm() {
+		const earned = this.gameScene.projectedDarkMatter;
+		this.stagePauseConfirm(`Collapse this run into a Singularity and bank ${earned} Dark Matter?`, () => {
+			this.pauseMenu.setVisible(false);
+			this.gameScene.enterSingularity();
+		});
+	}
+
+	private stagePauseConfirm(message: string, action: () => void) {
+		this.confirmWarning.setText(message);
+		this.pendingConfirm = action;
 		this.pauseMainButtons.setVisible(false);
 		this.pauseConfirmButtons.setVisible(true);
 	}
 
-	private confirmReset() {
+	private runConfirm() {
+		const action = this.pendingConfirm;
+		this.pendingConfirm = null;
+		action?.();
+	}
+
+	// --- The Ascendancy (prestige tree) ----------------------------------------------------------------------
+
+	private buildAscendancyMenu(width: number, height: number) {
+		const cx = width / 2;
+		const cy = height / 2;
+
+		// Tap-outside returns to the pause menu rather than resuming, so a stray tap can't unpause mid-spend.
+		const overlay = this.add.rectangle(cx, cy, width, height, 0x03060f, 0.82).setInteractive();
+		overlay.on('pointerup', () => this.closeAscendancyToPause());
+		const panel = this.add.image(cx, cy, 'ui-window').setDisplaySize(ASCENDANCY_PANEL_WIDTH, ASCENDANCY_PANEL_HEIGHT).setInteractive();
+		const heading = this.add.bitmapText(cx, cy + ASCENDANCY_HEADING_Y, FONT, 'THE ASCENDANCY', 30)
+			.setOrigin(0.5).setCenterAlign().setTintFill(0xcfe6ff);
+		this.ascendancyBalance = this.add.bitmapText(cx, cy + ASCENDANCY_BALANCE_Y, FONT, '', 22)
+			.setOrigin(0.5).setCenterAlign().setTintFill(DARK_MATTER_TINT);
+
+		const children: Array<Phaser.GameObjects.GameObject> = [overlay, panel, heading, this.ascendancyBalance];
+
+		ASCENDANCY_NODES.forEach((id, i) => {
+			const rowY = cy + ASCENDANCY_ROWS_Y + i * ASCENDANCY_ROW_HEIGHT;
+			const title = this.add.bitmapText(cx + ASCENDANCY_TEXT_X, rowY - 24, FONT, '', 20)
+				.setOrigin(0, 0.5).setTintFill(0xcfe6ff);
+			const detail = this.add.bitmapText(cx + ASCENDANCY_TEXT_X, rowY + 16, FONT, ASCENDANCY_NODE_DEFS[id].perLevel, 15)
+				.setOrigin(0, 0.5).setMaxWidth(ASCENDANCY_TEXT_MAX_WIDTH).setTintFill(0x8fd6ff);
+			const button = this.add.image(cx + ASCENDANCY_BUY_X, rowY, 'ui-button')
+				.setDisplaySize(ASCENDANCY_BUY_WIDTH, ASCENDANCY_BUY_HEIGHT)
+				.setInteractive({ useHandCursor: true });
+			const buttonLabel = this.add.bitmapText(cx + ASCENDANCY_BUY_X, rowY, FONT, '', 15)
+				.setOrigin(0.5).setCenterAlign().setTintFill(0xffffff);
+			button.on('pointerup', () => this.gameScene.buyAscendancyNode(id));
+
+			this.ascendancyRows.set(id, { title, detail, button, buttonLabel });
+			children.push(title, detail, button, buttonLabel);
+		});
+
+		const closeButton = this.add.image(cx, cy + ASCENDANCY_CLOSE_Y, 'ui-button-green')
+			.setDisplaySize(240, 60)
+			.setInteractive({ useHandCursor: true });
+		const closeLabel = this.add.bitmapText(cx, cy + ASCENDANCY_CLOSE_Y, FONT, 'Back', 20)
+			.setOrigin(0.5).setCenterAlign().setTintFill(0xffffff);
+		closeButton.on('pointerup', () => this.closeAscendancyToPause());
+		children.push(closeButton, closeLabel);
+
+		this.ascendancyMenu = this.add.container(0, 0, children).setDepth(95).setVisible(false);
+	}
+
+	private openAscendancyMenu() {
 		this.pauseMenu.setVisible(false);
-		this.gameScene.resetProgressToStart();
+		this.ascendancyMenu.setVisible(true);
+		this.refreshAscendancyMenu();
+	}
+
+	private closeAscendancyMenu() {
+		this.ascendancyMenu.setVisible(false);
+	}
+
+	// The tree hangs off the pause menu, so backing out returns there (still paused) rather than resuming.
+	private closeAscendancyToPause() {
+		if(!this.ascendancyMenu.visible) {
+			return;
+		}
+		this.closeAscendancyMenu();
+		if(this.gameScene.gameState === 'playing') {
+			this.showPauseMain();
+			this.pauseMenu.setVisible(true);
+		}
+	}
+
+	private refreshAscendancyMenu() {
+		const meta = this.gameScene.prestigeMeta;
+		this.ascendancyBalance.setText(`Dark Matter: ${meta.darkMatter}`);
+
+		for(const id of ASCENDANCY_NODES) {
+			const row = this.ascendancyRows.get(id)!;
+			const def = ASCENDANCY_NODE_DEFS[id];
+			const level = nodeLevel(meta.nodes, id);
+			row.title.setText(`${def.name}   ${level}/${def.maxLevel}`);
+
+			if(nodeMaxed(meta, id)) {
+				row.buttonLabel.setText('MAX');
+				this.styleBuyButton(row.button, false);
+			} else if(!nodeAvailable(meta, id)) {
+				const req = def.requires!;
+				row.buttonLabel.setText(`Needs ${ASCENDANCY_NODE_DEFS[req.node].name} ${req.level}`);
+				this.styleBuyButton(row.button, false);
+			} else {
+				const cost = nodeCost(meta, id);
+				row.buttonLabel.setText(`Buy  ${cost} DM`);
+				this.styleBuyButton(row.button, meta.darkMatter >= cost);
+			}
+		}
 	}
 
 	// --- Level-change toast ----------------------------------------------------------------------------------

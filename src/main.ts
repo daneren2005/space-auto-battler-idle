@@ -1,14 +1,18 @@
 import { levels, firstLevel } from '@/data/levels';
 import { loadProgress } from '@/data/progress';
+import { loadMeta } from '@/data/meta';
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT } from '@/game/display';
 import startGame from '@/game/start-game';
 
-// Campaign entry point: resume at the saved level with carried upgrades / money.
+// Campaign entry point: resume at the saved level with carried upgrades / money and the prestige meta.
 const progress = loadProgress();
+const meta = loadMeta();
 
 export const game = startGame({
 	level: levels[progress.levelIndex] ?? firstLevel,
 	carry: progress.carry,
+	highestLevelIndex: progress.highestLevelIndex,
+	meta,
 	width: DISPLAY_WIDTH,
 	height: DISPLAY_HEIGHT,
 });

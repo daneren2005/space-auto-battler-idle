@@ -71,6 +71,8 @@ export interface ShipTypeDef {
 	steerBonus?: number
 	// Shields at level 1 (0 = dies to the first hit until levelled up).
 	baseShields: number
+	// Seconds out of combat before shields start regenerating. Rises with hull size (Skiff fastest, Carrier slowest).
+	shieldRegenTime: number
 	// Ram damage (0 = keeps its distance).
 	contactDamage: number
 	// Per-ship level-up schedule: each track grows one stat on its own cadence, so a ship's identity comes through
@@ -226,7 +228,7 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		sprite: 'ships/skiff.png',
 		width: 10, height: 5,
 		speed: 100, steerForce: 10, steerBonus: 0.5,
-		baseShields: 0, contactDamage: 1,
+		baseShields: 0, shieldRegenTime: 2, contactDamage: 1,
 		progression: [{ stat: 'shields', every: 1 }, { stat: 'damage', every: 4 }],
 		killReward: 1,
 		unlockCost: 0, ...SKIFF_ECONOMY,
@@ -237,7 +239,7 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		sprite: 'ships/gunner.png',
 		width: 12, height: 8,
 		speed: 80, steerForce: 8, steerBonus: 0.2,
-		baseShields: 1, contactDamage: 0,
+		baseShields: 1, shieldRegenTime: 3, contactDamage: 0,
 		// A dedicated gun: damage climbs every level, with only an occasional shield.
 		progression: [{ stat: 'damage', every: 1 }, { stat: 'shields', every: 3 }],
 		weapon: { range: 120, fireInterval: 0.6, projectileCount: 1, projectileSpeed: 260, damage: 1, projectileNoun: 'Bullet' },
@@ -250,7 +252,7 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		sprite: 'ships/missile-frigate.png',
 		width: 16, height: 10,
 		speed: 60, steerForce: 3, steerBonus: 0.4,
-		baseShields: 0, contactDamage: 0,
+		baseShields: 0, shieldRegenTime: 5, contactDamage: 0,
 		// A swarm: one more missile every level, an occasional shield, and its per-missile damage only every 4th.
 		progression: [{ stat: 'projectiles', every: 1 }, { stat: 'shields', every: 3 }, { stat: 'damage', every: 4 }],
 		weapon: { range: 160, fireInterval: 1.4, projectileCount: 3, spread: 0.3, projectileSpeed: 160, damage: 1, homing: true, strafe: true, projectileNoun: 'Missile' },
@@ -263,7 +265,7 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		sprite: 'ships/railgun-lancer.png',
 		width: 18, height: 6,
 		speed: 45, steerForce: 2.5, steerBonus: 0.1,
-		baseShields: 0, contactDamage: 0,
+		baseShields: 0, shieldRegenTime: 4, contactDamage: 0,
 		// Ever-heavier slug: damage every level, with only an occasional shield to keep it glassy.
 		progression: [{ stat: 'damage', every: 1 }, { stat: 'shields', every: 3 }],
 		weapon: { range: 260, fireInterval: 3, projectileCount: 1, projectileSpeed: 500, damage: 6, projectileNoun: 'Slug' },
@@ -276,7 +278,7 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		sprite: 'ships/detonator.png',
 		width: 12, height: 12,
 		speed: 90, steerForce: 9, steerBonus: 0.5,
-		baseShields: 0, contactDamage: 4,
+		baseShields: 0, shieldRegenTime: 3, contactDamage: 4,
 		// Alternates each level: a bigger blast on the even levels, another shield on the odd.
 		progression: [{ stat: 'damage', every: 2, phase: 0 }, { stat: 'shields', every: 2, phase: 1 }],
 		detonateOnContact: { blastRadius: 40 },
@@ -289,7 +291,7 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		sprite: 'ships/bulwark.png',
 		width: 20, height: 16,
 		speed: 50, steerForce: 2.5, steerBonus: 0.2,
-		baseShields: 6, contactDamage: 2,
+		baseShields: 6, shieldRegenTime: 2, contactDamage: 2,
 		// Wall: two shields every level, a little damage every 4th.
 		progression: [{ stat: 'shields', every: 1, amount: 2 }, { stat: 'damage', every: 4 }],
 		weapon: { range: 40, fireInterval: 1, projectileCount: 1, projectileSpeed: 200, damage: 1, projectileNoun: 'Bullet' },
@@ -302,7 +304,7 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		sprite: 'ships/wasp.png',
 		width: 8, height: 6,
 		speed: 140, steerForce: 14, steerBonus: 0.6,
-		baseShields: 0, contactDamage: 0,
+		baseShields: 0, shieldRegenTime: 2, contactDamage: 0,
 		// Pure glass: damage every level and never a shield - it lives or dies on speed.
 		progression: [{ stat: 'damage', every: 1 }],
 		weapon: { range: 60, fireInterval: 0.25, projectileCount: 1, projectileSpeed: 220, damage: 1, projectileNoun: 'Pellet' },
@@ -315,7 +317,7 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		sprite: 'ships/scatter-gun.png',
 		width: 14, height: 10,
 		speed: 70, steerForce: 7, steerBonus: 0.1,
-		baseShields: 1, contactDamage: 0,
+		baseShields: 1, shieldRegenTime: 4, contactDamage: 0,
 		// A widening spread: one more pellet every level, its per-pellet damage and a shield only occasionally.
 		progression: [{ stat: 'projectiles', every: 1 }, { stat: 'damage', every: 3 }, { stat: 'shields', every: 3 }],
 		weapon: { range: 80, fireInterval: 0.9, projectileCount: 5, spread: 0.5, projectileSpeed: 200, damage: 1, projectileNoun: 'Pellet' },
@@ -328,7 +330,7 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		sprite: 'ships/stormcaller.png',
 		width: 14, height: 12,
 		speed: 65, steerForce: 1, steerBonus: 0.5,
-		baseShields: 2, contactDamage: 0,
+		baseShields: 2, shieldRegenTime: 5, contactDamage: 0,
 		// Alternates arcs and power: another arc on the odd levels, more per-arc damage on the even, a rare shield.
 		progression: [{ stat: 'projectiles', every: 2, phase: 1 }, { stat: 'damage', every: 2, phase: 0 }, { stat: 'shields', every: 3 }],
 		weapon: { range: 90, fireInterval: 1.1, projectileCount: 3, spread: 0.8, projectileSpeed: 240, damage: 1, homing: true, homingTurn: 45, projectileNoun: 'Arc' },
@@ -341,7 +343,7 @@ export const SHIP_TYPE_DEFS: Record<ShipType, ShipTypeDef> = {
 		sprite: 'ships/carrier.png',
 		width: 24, height: 18,
 		speed: 40, steerForce: 0.5, steerBonus: 0.03,
-		baseShields: 3, contactDamage: 0,
+		baseShields: 3, shieldRegenTime: 10, contactDamage: 0,
 		// A growing flight deck: a new drone every level, with two shields every 3rd to offset the swarm.
 		progression: [{ stat: 'projectiles', every: 1 }, { stat: 'shields', every: 3, amount: 2 }],
 		weapon: { range: 220, fireInterval: 2.5, projectileCount: 2, spread: 0.6, projectileSpeed: 120, damage: 0, spawnsDrones: true },

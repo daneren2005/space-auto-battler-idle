@@ -178,6 +178,7 @@ export async function* autoPlay(options: AutoPlayOptions = {}): AsyncGenerator<A
 	});
 
 	let levelIndex = 0;
+	let highestLevelIndex = 0;
 	let carry: Carry = emptyCarry();
 	let totalMs = 0;
 	const deaths: Array<number> = Array.from({ length: levels.length }, () => 0);
@@ -244,12 +245,13 @@ export async function* autoPlay(options: AutoPlayOptions = {}): AsyncGenerator<A
 			if(outcome === 'won') {
 				yield { type: 'win', levelIndex, level, levelMs, state: stationState(player), totalMs };
 
-				const next = progressAfterMatch('won', levelIndex, nextLevelIndex, carryFromStation(player));
+				const next = progressAfterMatch('won', levelIndex, nextLevelIndex, carryFromStation(player), highestLevelIndex);
 				if(next === 'reset') {
 					yield { type: 'end', reason: 'campaign-cleared', totalMs };
 					return;
 				}
 				levelIndex = next.levelIndex;
+				highestLevelIndex = next.highestLevelIndex;
 				carry = next.carry;
 			} else {
 				// The player station is already gone, so report the snapshot taken as it died.
@@ -261,10 +263,11 @@ export async function* autoPlay(options: AutoPlayOptions = {}): AsyncGenerator<A
 					return;
 				}
 
-				const next = progressAfterMatch('lost', levelIndex, nextLevelIndex, lossCarry);
+				const next = progressAfterMatch('lost', levelIndex, nextLevelIndex, lossCarry, highestLevelIndex);
 				// A loss never resets; guard for the type all the same.
 				if(next !== 'reset') {
 					levelIndex = next.levelIndex;
+					highestLevelIndex = next.highestLevelIndex;
 					carry = next.carry;
 				}
 			}

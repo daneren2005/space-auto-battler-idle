@@ -24,12 +24,13 @@ describe('progress', () => {
 	});
 
 	it('defaults to level 0 with an empty carry when nothing is saved', () => {
-		expect(loadProgress()).toEqual({ levelIndex: 0, carry: emptyCarry() });
+		expect(loadProgress()).toEqual({ levelIndex: 0, highestLevelIndex: 0, carry: emptyCarry() });
 	});
 
 	it('round-trips a saved per-type carry', () => {
 		const progress = {
 			levelIndex: 1,
+			highestLevelIndex: 4,
 			carry: { money: 7, ships: { skiff: { rate: 3, level: 2 }, gunner: { rate: 1, level: 1 } } },
 		};
 		saveProgress(progress);
@@ -37,9 +38,11 @@ describe('progress', () => {
 	});
 
 	it('backfills a partial per-type entry to whole rate/level counts', () => {
-		saveProgress({ levelIndex: 1, carry: { ships: { skiff: { rate: 4 } } } as never });
+		saveProgress({ levelIndex: 1, carry: { ships: { skiff: { rate: 4 } } } as never } as never);
 		expect(loadProgress()).toEqual({
 			levelIndex: 1,
+			// No peak saved, so it seeds from the current level.
+			highestLevelIndex: 1,
 			carry: { money: 0, ships: { skiff: { rate: 4, level: 0 } } },
 		});
 	});
@@ -49,12 +52,13 @@ describe('progress', () => {
 		saveProgress({ levelIndex: 2, carry: { shipRateUpgrades: 5, shieldUpgrades: 3, money: 9 } } as never);
 		expect(loadProgress()).toEqual({
 			levelIndex: 2,
+			highestLevelIndex: 2,
 			carry: { money: 9, ships: { skiff: { rate: 5, level: 3 } } },
 		});
 	});
 
 	it('reset clears back to the default', () => {
-		saveProgress({ levelIndex: 2, carry: emptyCarry() });
+		saveProgress({ levelIndex: 2, highestLevelIndex: 2, carry: emptyCarry() });
 		resetProgress();
 		expect(loadProgress().levelIndex).toBe(0);
 	});
@@ -64,27 +68,32 @@ describe('progressAfterMatch', () => {
 	const carry: Carry = { money: 40, ships: { skiff: { rate: 3, level: 2 } } };
 
 	it('advances a win to the next level carrying the earned upgrades and money forward', () => {
-		expect(progressAfterMatch('won', 1, 2, carry)).toEqual({ levelIndex: 2, carry });
+		expect(progressAfterMatch('won', 1, 2, carry, 1)).toEqual({ levelIndex: 2, highestLevelIndex: 2, carry });
+	});
+
+	it('raises the recorded peak when a win pushes past it', () => {
+		// Advancing to level 6 (index 5) from a run whose peak was index 4 lifts the peak to 5.
+		expect(progressAfterMatch('won', 4, 5, carry, 4)).toEqual({ levelIndex: 5, highestLevelIndex: 5, carry });
 	});
 
 	it('resets the run when the last level is won (no next level)', () => {
-		expect(progressAfterMatch('won', 5, -1, carry)).toBe('reset');
+		expect(progressAfterMatch('won', 5, -1, carry, 5)).toBe('reset');
 	});
 
-	it('drops back a level on a loss, keeping the money and upgrades the player died with', () => {
+	it('drops back a level on a loss, keeping the money and upgrades - and the peak - the player died with', () => {
 		// A loss falls back to the previous level (index 3 -> 2) carrying forward the money / upgrades the player
 		// ended the failed attempt with - so an idle run keeps banking money on a level it can still clear rather
-		// than stalling on the wall, and each attempt resumes stronger.
-		expect(progressAfterMatch('lost', 3, 4, carry)).toEqual({ levelIndex: 2, carry });
+		// than stalling on the wall, and each attempt resumes stronger. The recorded peak never drops.
+		expect(progressAfterMatch('lost', 3, 4, carry, 4)).toEqual({ levelIndex: 2, highestLevelIndex: 4, carry });
 	});
 
 	it('falls back regardless of whether this level has a next one', () => {
 		// The next-level index is irrelevant to a loss; it always steps one level back.
-		expect(progressAfterMatch('lost', 5, -1, carry)).toEqual({ levelIndex: 4, carry });
+		expect(progressAfterMatch('lost', 5, -1, carry, 5)).toEqual({ levelIndex: 4, highestLevelIndex: 5, carry });
 	});
 
 	it('holds on the first level when a loss has nowhere further back to go', () => {
-		expect(progressAfterMatch('lost', 0, 1, carry)).toEqual({ levelIndex: 0, carry });
+		expect(progressAfterMatch('lost', 0, 1, carry, 0)).toEqual({ levelIndex: 0, highestLevelIndex: 0, carry });
 	});
 });
 

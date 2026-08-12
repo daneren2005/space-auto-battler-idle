@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { LevelConfig } from '@/data/levels';
 import type { Carry } from '@/data/progress';
+import type { Meta } from '@/data/meta';
 import GameWorld from './entities/game-world';
 import GameScene from './game-scene';
 import UIScene from './ui-scene';
@@ -15,6 +16,10 @@ declare global {
 export interface StartGameOptions {
 	level: LevelConfig
 	carry: Carry
+	// Highest level the run has reached so far (prestige banks Dark Matter off it).
+	highestLevelIndex?: number
+	// The prestige meta (Dark Matter + Ascendancy). Absent for scratch levels.
+	meta?: Meta
 	// Canvas resolution: portrait for the campaign, landscape for the stress test.
 	width: number
 	height: number
@@ -51,6 +56,8 @@ export default function startGame(options: StartGameOptions): Phaser.Game {
 				world,
 				level: options.level,
 				carry: options.carry,
+				highestLevelIndex: options.highestLevelIndex,
+				meta: options.meta,
 				persistProgress: options.persistProgress,
 			}),
 			new UIScene(),

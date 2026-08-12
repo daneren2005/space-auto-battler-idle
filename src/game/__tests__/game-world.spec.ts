@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import GameWorld from '../entities/game-world';
 import entityList from '../entities/entity-list';
 import { factionCollision } from '@/data/collide-categories';
-import { SHIP_TYPE_INDEX, SHIP_TYPE_DEFS, killReward } from '@/data/ship-types';
+import { SHIP_TYPE_INDEX, SHIP_TYPE_DEFS, killReward, contactDamageForLevel } from '@/data/ship-types';
 
 // Two distinct station colours.  Ships inherit their owning station's colour, and targeting only ever picks a
 // different-coloured entity, so these pick who hunts whom.
@@ -359,6 +359,87 @@ describe('GameWorld game loop', () => {
 
 		expect(ship.components.bounciness!.bounciness).toBe(1);
 		expect(station.components.bounciness).toBeUndefined();
+	});
+});
+
+// The prestige multipliers (Salvage / Doctrine / Munitions) live on the player's controller + hangar blocks and are
+// read live by the spawn/physics workers. A non-player station keeps the default 1x, so setting them here on one
+// station and not another proves the worker honours the stamp rather than applying a bonus to everyone.
+describe('GameWorld prestige multipliers', () => {
+	it('scales the money a kill pays by the earner\'s Salvage multiplier', async () => {
+		world = new GameWorld();
+		world.load({
+			bounds: { width: 400, height: 400 },
+			entities: [
+				{ type: 'station', color: RED, ...RED_FACTION, x: 20, y: 20 },
+				{ type: 'station', color: BLUE, ...BLUE_FACTION, x: 380, y: 380 },
+			],
+		});
+		await world.init();
+
+		const redStation = entityList(world)[0];
+		const blueStation = entityList(world)[1];
+		// Red earns double; blue keeps the default. Same overlapping stand-off as the bounty tests above.
+		redStation.components.controller!.moneyMultiplier = 2;
+
+		const red = world.loadEntity({ type: 'skiff', x: 200, y: 200, owner: redStation.eid, ...RED_FACTION, maxShields: 3, timeToRegenerateShields: 1000 });
+		const blue = world.loadEntity({ type: 'skiff', x: 200, y: 200, owner: blueStation.eid, ...BLUE_FACTION, maxShields: 1, bounty: 5, timeToRegenerateShields: 1000 });
+		const redEid = red.eid;
+		const blueEid = blue.eid;
+
+		for(let i = 0; i < 40 && world.getEntityByEid(blueEid); i++) {
+			world.update(250);
+		}
+
+		expect(world.getEntityByEid(blueEid)).toBeUndefined();
+		expect(world.getEntityByEid(redEid)).toBeDefined();
+		// The bounty of 5 paid out at Red's 2x Salvage multiplier.
+		expect(redStation.components.controller!.money).toBe(10);
+	});
+
+	it('scales a station\'s ships/second by its Doctrine multiplier', async () => {
+		world = new GameWorld();
+		world.load({
+			bounds: { width: 400, height: 400 },
+			entities: [
+				{ type: 'station', color: RED, ...RED_FACTION, ships: { skiff: { rate: 5 } }, x: 200, y: 200 },
+			],
+		});
+		await world.init();
+
+		const gameWorld = world;
+		const station = entityList(gameWorld)[0];
+		// Doubling the rate makes a 5/second line spawn a whole ship every 100ms frame instead of half of one.
+		station.components.hangar!.rateMultiplier = 2;
+
+		const shipCount = () => entityList(gameWorld).filter(entity => !!entity.components.controlled).length;
+
+		gameWorld.update(100);
+		expect(shipCount()).toBe(1);
+		gameWorld.update(100);
+		expect(shipCount()).toBe(2);
+	});
+
+	it('scales a spawned ship\'s damage by its Munitions multiplier', async () => {
+		world = new GameWorld();
+		world.load({
+			bounds: { width: 400, height: 400 },
+			entities: [
+				{ type: 'station', color: RED, ...RED_FACTION, ships: { skiff: { rate: 10 } }, x: 200, y: 200 },
+			],
+		});
+		await world.init();
+
+		const gameWorld = world;
+		const station = entityList(gameWorld)[0];
+		station.components.hangar!.damageMultiplier = 3;
+
+		gameWorld.update(100);
+
+		const ship = entityList(gameWorld).find(entity => !!entity.components.controlled);
+		expect(ship).toBeDefined();
+		// The spawn worker stamped the level-1 contact damage lifted by the 3x Munitions multiplier.
+		expect(ship!.components.combat!.contactDamage).toBeCloseTo(contactDamageForLevel(SHIP_TYPE_DEFS.skiff, 1) * 3);
 	});
 });
 

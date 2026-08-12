@@ -4,7 +4,7 @@ import { TRANSFORM_X_INDEX, TRANSFORM_Y_INDEX, BODY_CATEGORY_INDEX, BODY_MASK_IN
 import type { Components, ComponentArrays } from '../components';
 import computeAngle from '@/math/compute-angle';
 import { SHIP_TYPES, SHIP_TYPE_INDEX, SHIP_TYPE_DEFS, shieldsForLevel, contactDamageForLevel, weaponDamageForLevel, projectileCountForLevel } from '@/data/ship-types';
-import { hangarRateIndex, hangarLevelIndex, hangarProgressIndex } from '../components/hangar';
+import { hangarRateIndex, hangarLevelIndex, hangarProgressIndex, HANGAR_RATE_MULT, HANGAR_DAMAGE_MULT, HANGAR_MULT_SCALE } from '../components/hangar';
 import { seedRand, type SeededWorld } from './seeded-world';
 
 // A freshly-spawned ship's random initial velocity magnitude, in pixels/second.
@@ -30,6 +30,11 @@ export const spawnShipUpdate: EntityUpdateFunction<Components, Pick<ComponentArr
 	const collideMask = body[BODY_MASK_INDEX];
 	const elapsedMicros = Math.round(world.elapsedTime * 1_000);
 
+	// Prestige multipliers stamped on this station's hangar (Doctrine ships/second, Munitions damage). Default 1x
+	// on every non-player station. Read plainly: the main thread only writes them at load, before any run.
+	const rateMultiplier = hangar[HANGAR_RATE_MULT] / HANGAR_MULT_SCALE;
+	const damageMultiplier = hangar[HANGAR_DAMAGE_MULT] / HANGAR_MULT_SCALE;
+
 	for(const type of SHIP_TYPES) {
 		const typeIndex = SHIP_TYPE_INDEX[type];
 
@@ -39,9 +44,10 @@ export const spawnShipUpdate: EntityUpdateFunction<Components, Pick<ComponentArr
 			continue;
 		}
 
-		// progress is only ever touched here (single writer), so a plain read-modify-write is safe.
+		// progress is only ever touched here (single writer), so a plain read-modify-write is safe. Doctrine scales
+		// the accumulation so a fractional bonus still lands over time even though `rate` itself is a whole number.
 		const progressIndex = hangarProgressIndex(typeIndex);
-		const progress = hangar[progressIndex] + elapsedMicros * rate;
+		const progress = hangar[progressIndex] + elapsedMicros * rate * rateMultiplier;
 		const spawning = Math.floor(progress / PROGRESS_PER_SHIP);
 		hangar[progressIndex] = progress - spawning * PROGRESS_PER_SHIP;
 		if(spawning <= 0) {
@@ -52,8 +58,8 @@ export const spawnShipUpdate: EntityUpdateFunction<Components, Pick<ComponentArr
 		const level = Atomics.load(hangar, hangarLevelIndex(typeIndex));
 		const def = SHIP_TYPE_DEFS[type];
 		const maxShields = shieldsForLevel(def, level);
-		const contactDamage = contactDamageForLevel(def, level);
-		const weaponDamage = def.weapon ? weaponDamageForLevel(def, level) : undefined;
+		const contactDamage = contactDamageForLevel(def, level) * damageMultiplier;
+		const weaponDamage = def.weapon ? weaponDamageForLevel(def, level) * damageMultiplier : undefined;
 		// Any weapon whose volley (or a Carrier's drone launch) grows with level is stamped its level-scaled count.
 		const weaponProjectileCount = def.weapon ? projectileCountForLevel(def, level) : undefined;
 

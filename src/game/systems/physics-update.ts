@@ -25,7 +25,7 @@ import type { Components } from '../components';
 import type { CustomSystemWorld } from './game-component-system';
 import computeAngle from '@/math/compute-angle';
 import { HEALTH_SHIELDS, HEALTH_TIME_SINCE_DAMAGE, HEALTH_DAMAGE_COOLDOWN } from '../components/health';
-import { CONTROLLER_MONEY } from '../components/controller';
+import { CONTROLLER_MONEY, CONTROLLER_MONEY_MULT, CONTROLLER_MULT_SCALE } from '../components/controller';
 import { CONTROLLED_OWNER } from '../components/controlled';
 import { COMBAT_CONTACT_DAMAGE, COMBAT_BLAST_RADIUS, COMBAT_BOUNTY, DETONATED_EVENT } from '../components/combat';
 
@@ -395,8 +395,10 @@ function creditMoney(stationEid: number | undefined, amount: number) {
 
 	const controller = blocksByEid[stationEid]?.controller;
 	if(controller) {
+		// Salvage (prestige) scales the player's take; enemies keep the default 1x multiplier.
+		const scaled = Math.round(amount * controller[CONTROLLER_MONEY_MULT] / CONTROLLER_MULT_SCALE);
 		// Other ships touch this money on other threads too, so add atomically.
-		Atomics.add(controller, CONTROLLER_MONEY, amount);
+		Atomics.add(controller, CONTROLLER_MONEY, scaled);
 	}
 }
 

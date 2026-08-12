@@ -150,4 +150,16 @@ describe('ShipRoster', () => {
 		expect(roster.isLocked('gunner')).toBe(true);
 		expect(roster.money).toBe(1_000);
 	});
+
+	it('applies an Ascendancy cost discount to every price and the money it spends', async () => {
+		world = await loadStation(1_000);
+		// A live 50% Quartermaster discount: every quoted cost halves, and a buy spends the halved amount.
+		const roster = new ShipRoster(world, entityList(world)[0], () => 0.5);
+
+		expect(roster.unlockCost('gunner')).toBe(Math.round(SHIP_TYPE_DEFS.gunner.unlockCost * 0.5));
+		expect(roster.rateCost('skiff')).toBe(Math.round(SHIP_TYPE_DEFS.skiff.rateCostBase * 0.5));
+
+		expect(roster.buyRate('skiff')).toBe(true);
+		expect(roster.money).toBe(1_000 - Math.round(SHIP_TYPE_DEFS.skiff.rateCostBase * 0.5));
+	});
 });

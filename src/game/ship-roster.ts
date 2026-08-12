@@ -32,7 +32,9 @@ export default class ShipRoster {
 	private controllerBlock: Int32Array;
 	private hangarBlock: Int32Array;
 
-	constructor(private world: GameWorld, private station: StationEntity) {
+	// A live Ascendancy cost discount (Quartermaster). Read through a getter so buying the node mid-run takes effect
+	// at once; defaults to no discount so direct/test construction is unaffected.
+	constructor(private world: GameWorld, private station: StationEntity, private getCostDiscount: () => number = () => 1) {
 		const controller = station.components.controller;
 		const hangar = station.components.hangar;
 		if(!controller || !hangar) {
@@ -66,14 +68,19 @@ export default class ShipRoster {
 
 	// --- Costs -----------------------------------------------------------------------------------------------
 
+	// Discounts round to whole money so the UI and the spend stay integer.
+	private discounted(cost: number): number {
+		return Math.round(cost * this.getCostDiscount());
+	}
+
 	unlockCost(type: ShipType): number {
-		return unlockCost(SHIP_TYPE_DEFS[type]);
+		return this.discounted(unlockCost(SHIP_TYPE_DEFS[type]));
 	}
 	rateCost(type: ShipType): number {
-		return rateCost(SHIP_TYPE_DEFS[type], this.hangarBlock[hangarRateBoughtIndex(SHIP_TYPE_INDEX[type])]);
+		return this.discounted(rateCost(SHIP_TYPE_DEFS[type], this.hangarBlock[hangarRateBoughtIndex(SHIP_TYPE_INDEX[type])]));
 	}
 	levelCost(type: ShipType): number {
-		return levelCost(SHIP_TYPE_DEFS[type], this.hangarBlock[hangarLevelBoughtIndex(SHIP_TYPE_INDEX[type])]);
+		return this.discounted(levelCost(SHIP_TYPE_DEFS[type], this.hangarBlock[hangarLevelBoughtIndex(SHIP_TYPE_INDEX[type])]));
 	}
 
 	canUnlock(type: ShipType): boolean {

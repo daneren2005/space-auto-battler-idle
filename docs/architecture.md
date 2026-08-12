@@ -108,7 +108,9 @@ src/
     ship-types.ts         SINGLE SOURCE OF TRUTH for ship types (SHIP_TYPES, per-type WeaponDef/stats/costs).
     entities/             Entity templates (station, ship, drone, projectile). ship.ts stamps every ShipType.
     levels/               level-1.ts ... level-N.ts (hand-authored), types.ts, index.ts, player-start.ts, stress-test.ts.
-    progress.ts           localStorage meta-progress: which level + carried money/upgrades (Carry). Save migration lives here.
+    progress.ts           localStorage per-run progress: level + peak reached + carried money/upgrades (Carry). Save migration + startingCarry.
+    meta.ts               localStorage prestige record (separate key): Dark Matter + Ascendancy node levels + prestigeUnlocked. Node buy logic.
+    ascendancy.ts         The prestige tree: node defs + effect helpers (money/rate/damage multipliers, pre-unlocks, cost discount) + the Dark Matter formula.
     generate-scene.ts     Builds a Scene ({entities, bounds}) for the world to load.
     level-balance.ts, colors.ts, collide-categories.ts, pretty-memory.ts
   math/                   Small pure helpers (distance, angles, normalize, ...).
@@ -134,7 +136,21 @@ Tests live in `__tests__/` folders next to the code (`*.spec.ts`).
   screen is covered so the new level starts simulating immediately, then fades back in.
 - **Carry / progress.** `Carry` = unspent money + per-type bought rate/level upgrades. A win advances +
   saves; a loss drops back a level; both carry forward what the player finished with. `progressAfterMatch`
-  in [progress.ts](../src/data/progress.ts) is the single decision point.
+  in [progress.ts](../src/data/progress.ts) is the single decision point. `Progress` also tracks
+  `highestLevelIndex` (the peak, which a loss never lowers) — prestige banks off it and it gates the Singularity unlock.
+- **Prestige (Singularity / Dark Matter / Ascendancy).** A second persisted record ([meta.ts](../src/data/meta.ts),
+  its own localStorage key) holds banked **Dark Matter** + purchased **Ascendancy** node levels, so a prestige wipes
+  the run but never the meta. The Ascendancy ([ascendancy.ts](../src/data/ascendancy.ts)) is a small tree of
+  run-spanning nodes whose effects apply at run load / prestige time. Two kinds: **main-thread seeds/reads** —
+  Standing Fleet seeds a fresh run's `startingCarry`, Quartermaster is a live cost discount the `ShipRoster` reads,
+  Event Horizon scales Dark Matter earned; and **per-player worker multipliers** — Salvage (money earned), Doctrine
+  (ships/second), Munitions (ship damage) are stamped onto the player station's `controller.moneyMultiplier` /
+  `hangar.rateMultiplier` / `hangar.damageMultiplier` blocks in `setupStationsAndCarry` each load, and the physics /
+  spawn workers read them live off the block (fixed-point x1000, default 1x on every non-player station — no
+  `getInitData` plumbing, and refreshes on every in-place reload including after a prestige). **Enter the Singularity** (a pause-menu action, unlocked the first
+  time a run reaches `PRESTIGE_UNLOCK_LEVEL_INDEX`) banks `darkMatterForLevel(highestLevelIndex)`, wipes the run, and
+  reloads level 1 with the prestige-seeded carry. The GameScene owns the live `Meta`; the UIScene's Ascendancy modal
+  reads it and calls `buyAscendancyNode` / `enterSingularity`.
 - **Ship roster.** `ShipRoster` is a testable view+mutator over a station's money/hangar blocks. Values the
   spawn worker also reads (money, rate, level) are written with **Atomics**. The GameScene owns the player's
   roster; the UIScene drives it.
@@ -163,6 +179,12 @@ Tests live in `__tests__/` folders next to the code (`*.spec.ts`).
 - **Add a system** → create the `x-system.ts` / `x-update.ts` / `x.worker.ts` triple, then `addSystem` it in
   `GameWorld.initSystems` at the right point in the run order.
 - **Add a component** → new file in [components/](../src/game/components/), register it in `components/index.ts`.
+- **Add an Ascendancy node** → add its id to `ASCENDANCY_NODES` + a def in [ascendancy.ts](../src/data/ascendancy.ts),
+  write its effect helper there, and apply it where the effect lives (starting-carry seed / `ShipRoster` cost /
+  Dark Matter formula). The pause-menu Ascendancy modal renders every node in `ASCENDANCY_NODES` automatically. A
+  main-thread effect needs no worker changes; a per-run global multiplier the spawn/physics worker must see is
+  stamped onto the player's `controller` / `hangar` block in `setupStationsAndCarry` (fixed-point x1000) and read
+  live off the block by the worker — see Salvage / Doctrine / Munitions.
 
 ## Commands
 

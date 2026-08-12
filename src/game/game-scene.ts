@@ -12,7 +12,11 @@ import prettyMemory from '@/data/pretty-memory';
 import type { LevelConfig } from '@/data/levels';
 import { getLevelIndex, levels, firstLevel } from '@/data/levels';
 import type { Carry } from '@/data/progress';
-import { saveProgress, resetProgress, progressAfterMatch, emptyCarry } from '@/data/progress';
+import { saveProgress, resetProgress, progressAfterMatch, emptyCarry, startingCarry } from '@/data/progress';
+import type { Meta } from '@/data/meta';
+import { saveMeta, buyNode, emptyMeta } from '@/data/meta';
+import type { AscendancyNodeId, AscendancyNodes } from '@/data/ascendancy';
+import { costDiscount, moneyMultiplier, rateMultiplier, damageMultiplier, darkMatterForLevel, PRESTIGE_UNLOCK_LEVEL_INDEX } from '@/data/ascendancy';
 import type { Components } from './components';
 import { carryFromStation } from './player-carry';
 import {
@@ -84,6 +88,10 @@ export interface GameSceneOptions {
 	world: GameWorld
 	level: LevelConfig
 	carry: Carry
+	// Highest level the run has reached so far; prestige banks Dark Matter off it (defaults to the loaded level).
+	highestLevelIndex?: number
+	// The prestige meta (Dark Matter + Ascendancy). Absent for scratch levels; defaults to empty.
+	meta?: Meta
 	// Off for the stress test so a scratch battle can't advance or wipe a real run.
 	persistProgress?: boolean
 }
@@ -108,6 +116,8 @@ export default class GameScene extends Phaser.Scene {
 	private world: GameWorld;
 	private level: LevelConfig;
 	private carry: Carry;
+	private highestLevelIndex: number;
+	private meta: Meta;
 	private persistProgress: boolean;
 
 	private latestStats: GameStats = EMPTY_GAME_STATS;
@@ -150,6 +160,8 @@ export default class GameScene extends Phaser.Scene {
 		this.world = options.world;
 		this.level = options.level;
 		this.carry = options.carry;
+		this.highestLevelIndex = options.highestLevelIndex ?? Math.max(0, getLevelIndex(options.level.name));
+		this.meta = options.meta ?? emptyMeta();
 		this.persistProgress = options.persistProgress ?? true;
 		this.timing = new PerformanceTiming(this.world);
 	}
@@ -266,7 +278,13 @@ export default class GameScene extends Phaser.Scene {
 			}
 			playerController.money += this.carry.money;
 
-			this.roster = new ShipRoster(this.world, playerStation);
+			// Stamp the run's prestige multipliers onto the player's blocks so the workers apply them live: Salvage
+			// on the controller (money credited), Doctrine + Munitions on the hangar (ships/second + damage).
+			playerController.moneyMultiplier = moneyMultiplier(this.meta.nodes);
+			playerHangar.rateMultiplier = rateMultiplier(this.meta.nodes);
+			playerHangar.damageMultiplier = damageMultiplier(this.meta.nodes);
+
+			this.roster = new ShipRoster(this.world, playerStation, () => costDiscount(this.meta.nodes));
 		} else {
 			this.roster = undefined;
 		}
@@ -504,14 +522,79 @@ export default class GameScene extends Phaser.Scene {
 		return this.persistProgress;
 	}
 
-	// Wipe the save and restart from level 1 with an empty carry, behind the usual between-levels fade. The
+	// Wipe the run and restart from level 1 behind the usual between-levels fade. The Ascendancy (Dark Matter +
+	// nodes) is meta, so it survives - only the per-run save is cleared, and prestige bonuses re-seed the carry. The
 	// queued swap runs before update()'s pause early-return, so it fires even with the menu still paused.
 	resetProgressToStart(): void {
 		resetProgress();
+		this.highestLevelIndex = 0;
 		this.queueTransition(() => {
 			this.pendingNotice = { message: 'Progress reset - starting a fresh run.', tone: 'bad' };
-			this.loadLevel(firstLevel, emptyCarry());
+			this.loadLevel(firstLevel, startingCarry(this.meta.nodes));
 		});
+	}
+
+	// --- Prestige: The Ascendancy -----------------------------------------------------------------------
+
+	// Read-only snapshot for the HUD to price/gate Ascendancy nodes off (it calls the pure meta helpers with it).
+	get prestigeMeta(): Meta {
+		return this.meta;
+	}
+
+	get darkMatter(): number {
+		return this.meta.darkMatter;
+	}
+
+	// Ascendancy controls appear only once a run has reached the wall, and never on a scratch level.
+	get prestigeUnlocked(): boolean {
+		return this.persistProgress && this.meta.prestigeUnlocked;
+	}
+
+	get ascendancyNodes(): AscendancyNodes {
+		return this.meta.nodes;
+	}
+
+	// What Enter the Singularity would bank right now, for the confirm prompt.
+	get projectedDarkMatter(): number {
+		return darkMatterForLevel(this.highestLevelIndex, this.meta.nodes);
+	}
+
+	// Spend banked Dark Matter on an Ascendancy node; persists and returns whether the buy went through. The roster
+	// reads the discount live, so a Quartermaster buy takes effect on the next frame.
+	buyAscendancyNode(id: AscendancyNodeId): boolean {
+		const next = buyNode(this.meta, id);
+		if(next === this.meta) {
+			return false;
+		}
+		this.meta = next;
+		saveMeta(this.meta);
+		return true;
+	}
+
+	// Collapse the run into a Singularity: bank Dark Matter for the peak reached, wipe the run, and restart from
+	// level 1 with prestige bonuses seeded in. The Ascendancy persists across the reset.
+	enterSingularity(): void {
+		if(!this.prestigeUnlocked) {
+			return;
+		}
+		const earned = darkMatterForLevel(this.highestLevelIndex, this.meta.nodes);
+		this.meta = { ...this.meta, darkMatter: this.meta.darkMatter + earned };
+		saveMeta(this.meta);
+		resetProgress();
+		this.highestLevelIndex = 0;
+		this.queueTransition(() => {
+			this.pendingNotice = { message: `Entered the Singularity - banked ${earned} Dark Matter.`, tone: 'good' };
+			this.loadLevel(firstLevel, startingCarry(this.meta.nodes));
+		});
+	}
+
+	// Reaching the wall the first time is what unlocks prestige; flip + persist the meta once, on that frame.
+	private recordHighestLevel(index: number): void {
+		this.highestLevelIndex = Math.max(this.highestLevelIndex, index);
+		if(!this.meta.prestigeUnlocked && this.highestLevelIndex >= PRESTIGE_UNLOCK_LEVEL_INDEX) {
+			this.meta = { ...this.meta, prestigeUnlocked: true };
+			saveMeta(this.meta);
+		}
 	}
 
 	// --- Automatic level progression --------------------------------------------------------------------
@@ -533,14 +616,16 @@ export default class GameScene extends Phaser.Scene {
 
 		const levelIndex = getLevelIndex(this.level.name);
 		const nextLevelIndex = this.level.nextLevel ? getLevelIndex(this.level.nextLevel) : -1;
-		const next = progressAfterMatch(outcome, levelIndex, nextLevelIndex, this.currentCarry());
+		const next = progressAfterMatch(outcome, levelIndex, nextLevelIndex, this.currentCarry(), this.highestLevelIndex);
 		if(next === 'reset') {
 			resetProgress();
+			this.highestLevelIndex = 0;
 			this.queueTransition(() => {
 				this.pendingNotice = { message: 'You cleared every level! Starting a fresh run.', tone: 'good' };
-				this.loadLevel(firstLevel, emptyCarry());
+				this.loadLevel(firstLevel, startingCarry(this.meta.nodes));
 			});
 		} else {
+			this.recordHighestLevel(next.highestLevelIndex);
 			saveProgress(next);
 			const nextLevel = levels[next.levelIndex];
 			const notice = this.matchNotice(outcome, levelIndex, next.levelIndex);

@@ -15,7 +15,7 @@ export function makeShipConfig(type: ShipType): Config {
 		// Kill reward is fixed per type (doesn't scale with level), so it rides on the template.
 		bounty: def.killReward,
 		searchRange: Math.max(DEFAULT_SEARCH_RANGE, def.weapon?.range ?? 0),
-		timeToRegenerateShields: 1, damageCooldown: 0.2,
+		timeToRegenerateShields: def.shieldRegenTime, damageCooldown: 0.2,
 		velocityX: 0, attacks: true, interpolate: true, bounciness: 1,
 	};
 

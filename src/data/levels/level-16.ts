@@ -4,9 +4,9 @@ import { PLAYER_COLOR, ENEMY_COLOR } from '@/data/colors';
 import { factionCollision } from '@/data/collide-categories';
 import { PLAYER_START_SHIPS } from './player-start';
 
-// Act IV finale - the wall. Three maxed combined-arms bases on the biggest field, deliberately tuned to be
-// UNBEATABLE by an un-prestiged run: the intended stopping point that motivates the Singularity reset. No
-// `nextLevel` - until prestige exists, winning it just rolls back to a fresh run.
+// Act IV finale - the last level a maxed un-prestiged run can still grind out. Three combined-arms bases on a big
+// field; a lean fleet loses, but a fully upgraded one clears it. Act V (level 17+) is where the fleets climb past
+// that ceiling and a Singularity's Ascendancy bonuses become the only way through.
 const WIDTH = 660;
 const HEIGHT = 1080;
 const MARGIN = 140;
@@ -18,6 +18,7 @@ export const level16: LevelConfig = {
 	name: 'level-16',
 	title: 'Event Horizon',
 	bounds: { width: WIDTH, height: HEIGHT },
+	nextLevel: 'level-17',
 	entities: [
 		{
 			type: 'station',

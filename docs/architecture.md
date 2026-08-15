@@ -107,7 +107,8 @@ src/
   data/
     ship-types.ts         SINGLE SOURCE OF TRUTH for ship types (SHIP_TYPES, per-type WeaponDef/stats/costs).
     entities/             Entity templates (station, ship, drone, projectile). ship.ts stamps every ShipType.
-    levels/               level-1.ts ... level-N.ts (hand-authored), types.ts, index.ts, player-start.ts, stress-test.ts.
+    levels/               level-1.ts ... level-26.ts (hand-authored), types.ts, index.ts, player-start.ts, stress-test.ts.
+                          late-level.ts: the ascendantLevel() builder the Act V walls (17-26) share (three enemy bases + a player base).
     progress.ts           localStorage per-run progress: level + peak reached + carried money/upgrades (Carry). Save migration + startingCarry.
     meta.ts               localStorage prestige record (separate key): Dark Matter + Ascendancy node levels + prestigeUnlocked. Node buy logic.
     ascendancy.ts         The prestige tree: node defs + effect helpers (money/rate/damage multipliers, pre-unlocks, cost discount) + the Dark Matter formula.
@@ -150,7 +151,12 @@ Tests live in `__tests__/` folders next to the code (`*.spec.ts`).
   `getInitData` plumbing, and refreshes on every in-place reload including after a prestige). **Enter the Singularity** (a pause-menu action, unlocked the first
   time a run reaches `PRESTIGE_UNLOCK_LEVEL_INDEX`) banks `darkMatterForLevel(highestLevelIndex)`, wipes the run, and
   reloads level 1 with the prestige-seeded carry. The GameScene owns the live `Meta`; the UIScene's Ascendancy modal
-  reads it and calls `buyAscendancyNode` / `enterSingularity`.
+  reads it and calls `buyAscendancyNode` / `enterSingularity`. The headless [auto-play](../src/game/auto-play.ts)
+  mirrors the whole loop for the ai-run report: it carries its own `Meta`, stamps the multipliers + cost discount like
+  `setupStationsAndCarry`, and once a level past the unlock is lost more than `DEFAULT_PRESTIGE_AFTER_DEATHS` times it
+  banks Dark Matter, greedily buys the cheapest affordable nodes, and restarts (stopping if a prestige can't better the
+  previous run's peak). Act V (levels 17-26) is authored to need it: those walls are lethal to a maxed un-prestiged
+  fleet, so only the Ascendancy bonuses carry a run through.
 - **Ship roster.** `ShipRoster` is a testable view+mutator over a station's money/hangar blocks. Values the
   spawn worker also reads (money, rate, level) are written with **Atomics**. The GameScene owns the player's
   roster; the UIScene drives it.

@@ -228,4 +228,31 @@ describe('autoPlay', () => {
 		expect(dies.every(event => event.type === 'die' && event.level.name === 'wall')).toBe(true);
 		expect(events.at(-1)).toMatchObject({ type: 'end', reason: 'deaths-exceeded' });
 	}, 30_000);
+
+	it('prestiges once a level past the unlock is lost too many times, banks Dark Matter, buys a node, and restarts', async() => {
+		// Two winnable levels lead into a wall at index 2; with the unlock lowered to 0 the run can prestige off that
+		// peak (Dark Matter for reaching level 3 is enough to afford the cheapest node). The second time it grinds out
+		// on the same wall it can't better its peak, so it ends as prestige-stalled instead of looping forever.
+		const events = await collect(autoPlay({
+			levels: [winnableLevel('a', 'b'), winnableLevel('b', 'wall'), unwinnableLevel('wall')],
+			maxLevelMs: 30_000,
+			prestigeAfterDeaths: 2,
+			prestigeUnlockLevelIndex: 0,
+		}));
+
+		const prestiges = events.filter(event => event.type === 'prestige');
+		expect(prestiges.length).toBeGreaterThanOrEqual(1);
+		expect(prestiges[0]).toMatchObject({ type: 'prestige', highestLevelIndex: 2 });
+		if(prestiges[0].type === 'prestige') {
+			expect(prestiges[0].banked).toBeGreaterThan(0);
+		}
+
+		// The first node the greedy buyer can afford is the cheapest, Salvage, and the run restarts from level 1.
+		const nodes = events.filter(event => event.type === 'buy-node');
+		expect(nodes.some(event => event.type === 'buy-node' && event.id === 'salvage')).toBe(true);
+		const restart = events.findIndex(event => event.type === 'prestige');
+		expect(events.slice(restart).some(event => event.type === 'level-start' && event.levelIndex === 0)).toBe(true);
+
+		expect(events.at(-1)).toMatchObject({ type: 'end', reason: 'prestige-stalled' });
+	}, 60_000);
 });

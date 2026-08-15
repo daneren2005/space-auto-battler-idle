@@ -35,9 +35,9 @@ function enemyStations(levelIndex: number): Array<StationEntity> {
 const SHIP_TYPE_SET = new Set<string>(SHIP_TYPES);
 
 describe('campaign chain', () => {
-	it('has the 16 authored levels in order', () => {
+	it('has the 26 authored levels in order', () => {
 		expect(levels.map(level => level.name)).toEqual(
-			Array.from({ length: 16 }, (_, i) => `level-${i + 1}`),
+			Array.from({ length: 26 }, (_, i) => `level-${i + 1}`),
 		);
 	});
 

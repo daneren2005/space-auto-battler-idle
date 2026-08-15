@@ -25,10 +25,16 @@ export interface AscendancyNodeDef {
 // Tuning constants for each node's effect. Kept beside the defs so the effect helpers and the copy stay in sync.
 // The three combat/economy nodes (Salvage, Doctrine, Munitions) are per-level percentage bonuses the player's run
 // carries; their multipliers are written onto the player's controller/hangar blocks and read live by the workers.
-const SALVAGE_MONEY_PER_LEVEL = 0.15;
-const DOCTRINE_RATE_PER_LEVEL = 0.1;
-const MUNITIONS_DAMAGE_PER_LEVEL = 0.1;
-const QUARTERMASTER_DISCOUNT_PER_LEVEL = 0.06;
+// The combat/economy nodes are strong per rank AND cheap with high caps, so the first Singularity buys DEEP into
+// them - dozens of ranks, weighted toward Munitions (cheapest + deepest). Damage is the variance-killer: the Act V
+// fights are a race against kamikaze Detonator streams, and a fleet that out-damages them ends the race before a
+// leak can kill the station, turning the plateau's coin-flip into a clean sweep. A shallow buy instead re-converges
+// to a ~50/50 equilibrium only a level or two up (see docs/ai-run.md). Salvage/Doctrine cap at 8, Munitions at 10;
+// Quartermaster/Event Horizon stay at 5 so later Singularities still have something left to finish.
+const SALVAGE_MONEY_PER_LEVEL = 0.3;
+const DOCTRINE_RATE_PER_LEVEL = 0.2;
+const MUNITIONS_DAMAGE_PER_LEVEL = 0.2;
+const QUARTERMASTER_DISCOUNT_PER_LEVEL = 0.1;
 const EVENT_HORIZON_BONUS_PER_LEVEL = 0.1;
 const STANDING_FLEET_MAX = 4;
 
@@ -54,23 +60,23 @@ export const ASCENDANCY_NODE_DEFS: Record<AscendancyNodeId, AscendancyNodeDef> =
 		id: 'salvage',
 		name: 'Salvage',
 		perLevel: `+${pct(SALVAGE_MONEY_PER_LEVEL)}% money earned`,
-		maxLevel: 5,
-		costBase: 8, costGrowth: 1.6,
+		maxLevel: 8,
+		costBase: 2, costGrowth: 1.3,
 	},
 	standingFleet: {
 		id: 'standingFleet',
 		name: 'Standing Fleet',
 		perLevel: 'Start with one more ship type unlocked',
 		maxLevel: STANDING_FLEET_MAX,
-		costBase: 12, costGrowth: 1.8,
+		costBase: 4, costGrowth: 1.3,
 		requires: { node: 'salvage', level: 1 },
 	},
 	doctrine: {
 		id: 'doctrine',
 		name: 'Doctrine',
 		perLevel: `+${pct(DOCTRINE_RATE_PER_LEVEL)}% ships/second`,
-		maxLevel: 5,
-		costBase: 12, costGrowth: 1.7,
+		maxLevel: 8,
+		costBase: 2, costGrowth: 1.3,
 		requires: { node: 'salvage', level: 1 },
 	},
 	quartermaster: {
@@ -78,15 +84,15 @@ export const ASCENDANCY_NODE_DEFS: Record<AscendancyNodeId, AscendancyNodeDef> =
 		name: 'Quartermaster',
 		perLevel: `-${pct(QUARTERMASTER_DISCOUNT_PER_LEVEL)}% on all upgrade costs`,
 		maxLevel: 5,
-		costBase: 15, costGrowth: 1.7,
+		costBase: 4, costGrowth: 1.35,
 		requires: { node: 'salvage', level: 1 },
 	},
 	munitions: {
 		id: 'munitions',
 		name: 'Munitions',
 		perLevel: `+${pct(MUNITIONS_DAMAGE_PER_LEVEL)}% ship damage`,
-		maxLevel: 5,
-		costBase: 15, costGrowth: 1.7,
+		maxLevel: 10,
+		costBase: 2, costGrowth: 1.25,
 		requires: { node: 'doctrine', level: 1 },
 	},
 	eventHorizon: {
@@ -94,7 +100,7 @@ export const ASCENDANCY_NODE_DEFS: Record<AscendancyNodeId, AscendancyNodeDef> =
 		name: 'Event Horizon',
 		perLevel: `+${pct(EVENT_HORIZON_BONUS_PER_LEVEL)}% Dark Matter per prestige`,
 		maxLevel: 5,
-		costBase: 20, costGrowth: 2,
+		costBase: 10, costGrowth: 1.5,
 		requires: { node: 'quartermaster', level: 2 },
 	},
 };

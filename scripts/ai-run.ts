@@ -19,10 +19,16 @@ function seconds(ms: number): string {
 
 const END_MESSAGES: Record<AutoPlayEndReason, string> = {
 	'campaign-cleared': 'cleared every level - campaign complete.',
-	'deaths-exceeded': `died more than ${DEFAULT_MAX_DEATHS_PER_LEVEL} times on a single level - stopping.`,
+	'deaths-exceeded': `died more than ${DEFAULT_MAX_DEATHS_PER_LEVEL} times on a single level before prestige - stopping.`,
+	'prestige-stalled': 'a Singularity could not push past the previous run - stopping.',
 	'stalled': 'a level never resolved - stopping.',
 	'no-player': 'level had no player station - stopping.',
 };
+
+// Dark Matter carried into a level, shown only once a prestige has banked some (a fresh, pre-prestige run has none).
+function dm(darkMatter: number): string {
+	return darkMatter > 0 ? `  DM ${darkMatter}` : '';
+}
 
 // Formats one engine event into its report line.  Every event type produces a line.
 function formatEvent(event: AutoPlayEvent): string {
@@ -35,10 +41,16 @@ function formatEvent(event: AutoPlayEvent): string {
 				`$${event.action.cost}  (now r${event.rate}/l${event.level}, $${event.moneyLeft} left)`;
 		case 'win':
 			return `${at(event.totalMs)}  WIN ${event.level.name} "${event.level.title}"  ${seconds(event.levelMs)} on level  ` +
-				`$${event.state.money}  [${event.state.summary}]`;
+				`$${event.state.money}  [${event.state.summary}]${dm(event.darkMatter)}`;
 		case 'die':
 			return `${at(event.totalMs)}  DIE ${event.level.name} "${event.level.title}"  ${seconds(event.levelMs)} on level  ` +
-				`$${event.state.money}  [${event.state.summary}]  death ${event.deaths}/${DEFAULT_MAX_DEATHS_PER_LEVEL}`;
+				`$${event.state.money}  [${event.state.summary}]  death ${event.deaths}/${DEFAULT_MAX_DEATHS_PER_LEVEL}${dm(event.darkMatter)}`;
+		case 'prestige':
+			return `${at(event.totalMs)}  *** PRESTIGE peak level ${event.highestLevelIndex + 1}  banked ${event.banked} Dark Matter  ` +
+				`(${event.darkMatter} total) - entering the Singularity`;
+		case 'buy-node':
+			return `${at(event.totalMs)}  NODE ${event.id.padEnd(14)} -> level ${event.nodeLevel}  ` +
+				`${event.cost} DM  (${event.darkMatterLeft} DM left)`;
 		case 'stall':
 			return `${at(event.totalMs)}  STALL ${event.level.name} unresolved after ${seconds(event.levelMs)} of play.`;
 		case 'end':
@@ -64,6 +76,10 @@ async function main(): Promise<void> {
 	write('');
 	write('Each line starts with the total game time since the run began. `BUY` is one purchase; `WIN` / `DIE` end');
 	write('a level with the time spent on it, the money in hand, and each built type as `rate/level`.');
+	write('');
+	write('After more than 5 deaths on one level (once prestige is unlocked), the run collapses into a Singularity:');
+	write('a `*** PRESTIGE` line banks Dark Matter for the peak reached, `NODE` lines show the Ascendancy nodes it then');
+	write('buys, and the run restarts from level 1 with those bonuses. `DM n` on a `WIN`/`DIE` is the Dark Matter in hand.');
 	write('');
 
 	for await (const event of autoPlay()) {

@@ -1,3 +1,4 @@
+import { Component } from '@daneren2005/shared-memory-ecs';
 import type { ComponentDefinition } from '@daneren2005/shared-memory-ecs';
 import type Rand from 'rand-seed';
 
@@ -45,77 +46,84 @@ export interface AttackConfig {
 	standoffRange?: number
 	// Strafe across the target instead of holding still once in range (the Missile Frigate).
 	strafe?: boolean
+	// Worker-spawned ships pre-roll their per-ship steerForce + strafe leg in the spawn update (which holds the
+	// seeded RNG) and pass the final values here; toBlock reads them as-is. A directly-placed ship omits them and
+	// load() rolls instead - the two paths never overlap (spawn uses toBlock, direct placement uses load).
+	strafeTimer?: number
+}
+class AttackComponentImpl extends Component<Float32Array> implements AttackComponent {
+	get target() {
+		return this.block[ATTACK_TARGET];
+	}
+	set target(value: number) {
+		this.block[ATTACK_TARGET] = value;
+	}
+	get steerForce() {
+		return this.block[ATTACK_STEER_FORCE];
+	}
+	set steerForce(value: number) {
+		this.block[ATTACK_STEER_FORCE] = value;
+	}
+	get speed() {
+		return this.block[ATTACK_SPEED];
+	}
+	set speed(value: number) {
+		this.block[ATTACK_SPEED] = value;
+	}
+	get searchRange() {
+		return this.block[ATTACK_SEARCH_RANGE];
+	}
+	set searchRange(value: number) {
+		this.block[ATTACK_SEARCH_RANGE] = value;
+	}
+	get standoffRange() {
+		return this.block[ATTACK_STANDOFF_RANGE];
+	}
+	set standoffRange(value: number) {
+		this.block[ATTACK_STANDOFF_RANGE] = value;
+	}
+	get strafe() {
+		return this.block[ATTACK_STRAFE] === 1;
+	}
+	set strafe(value: boolean) {
+		this.block[ATTACK_STRAFE] = value ? 1 : 0;
+	}
+	get strafeTimer() {
+		return this.block[ATTACK_STRAFE_TIMER];
+	}
+	set strafeTimer(value: number) {
+		this.block[ATTACK_STRAFE_TIMER] = value;
+	}
 }
 export const attackDefinition: ComponentDefinition<AttackComponent, Float32Array, AttackConfig> = {
 	type: Float32Array,
 	size: 7,
 	loadProperties: ['attacks'],
-	load(entity, memory, config) {
+	// steerForce + the strafe leg are rolled per ship. A directly-placed ship (main thread) is given the `entity`, so
+	// it rolls from the seeded RNG here; a worker-spawned ship has no `entity` and the spawn update already rolled
+	// them, passing the final values as config.steerForce/strafeTimer (see AttackConfig) - read as-is.
+	toBlock(config, entity) {
+		const rand = entity ? (entity.world as unknown as { rand: Rand }).rand : undefined;
 		const strafe = config.strafe ? 1 : 0;
-		// The world's seeded RNG (entities load on the main thread) so a fixed-seed run rolls these identically.
-		const rand = (entity.world as unknown as { rand: Rand }).rand;
-		const index = memory.create([
+		return [
 			0,
-			rollSteerForce(config.steerForce, config.steerForceBonus, rand),
+			rand ? rollSteerForce(config.steerForce, config.steerForceBonus, rand) : config.steerForce,
 			config.speed,
 			config.searchRange ?? DEFAULT_SEARCH_RANGE,
 			config.standoffRange ?? 0,
 			strafe,
 			// Seed a random side + leg offset so a batch of strafers weaves out of phase, not in lockstep.
-			strafe ? (rand.next() < 0.5 ? -1 : 1) * rand.next() * STRAFE_LEG_SECONDS : 0,
-		]);
-		const block = memory.getBlock(index);
-
-		return {
-			index,
-			get target() {
-				return block[ATTACK_TARGET];
-			},
-			set target(value: number) {
-				block[ATTACK_TARGET] = value;
-			},
-			get steerForce() {
-				return block[ATTACK_STEER_FORCE];
-			},
-			set steerForce(value: number) {
-				block[ATTACK_STEER_FORCE] = value;
-			},
-			get speed() {
-				return block[ATTACK_SPEED];
-			},
-			set speed(value: number) {
-				block[ATTACK_SPEED] = value;
-			},
-			get searchRange() {
-				return block[ATTACK_SEARCH_RANGE];
-			},
-			set searchRange(value: number) {
-				block[ATTACK_SEARCH_RANGE] = value;
-			},
-			get standoffRange() {
-				return block[ATTACK_STANDOFF_RANGE];
-			},
-			set standoffRange(value: number) {
-				block[ATTACK_STANDOFF_RANGE] = value;
-			},
-			get strafe() {
-				return block[ATTACK_STRAFE] === 1;
-			},
-			set strafe(value: boolean) {
-				block[ATTACK_STRAFE] = value ? 1 : 0;
-			},
-			get strafeTimer() {
-				return block[ATTACK_STRAFE_TIMER];
-			},
-			set strafeTimer(value: number) {
-				block[ATTACK_STRAFE_TIMER] = value;
-			},
-		};
+			rand ? (strafe ? (rand.next() < 0.5 ? -1 : 1) * rand.next() * STRAFE_LEG_SECONDS : 0) : (config.strafeTimer ?? 0),
+		];
+	},
+	attach(entity, memory, index) {
+		return new AttackComponentImpl(memory.getBlock(index), index);
 	},
 };
 
-// A roll in [steerForce, steerForce * (1 + bonus)]. Omitting `bonus` makes every unit identical.
-function rollSteerForce(steerForce: number, bonus: number | undefined, rand: Rand): number {
+// A roll in [steerForce, steerForce * (1 + bonus)]. Omitting `bonus` makes every unit identical. Exported so the
+// spawn update can roll a worker-spawned ship's steerForce with the seeded RNG (toBlock can't reach it).
+export function rollSteerForce(steerForce: number, bonus: number | undefined, rand: Rand): number {
 	if(!bonus) {
 		return steerForce;
 	}

@@ -1,3 +1,4 @@
+import { Component } from '@daneren2005/shared-memory-ecs';
 import type { ComponentDefinition } from '@daneren2005/shared-memory-ecs';
 import { SHIP_TYPES, SHIP_TYPE_INDEX, SHIP_TYPE_COUNT, type ShipType } from '@/data/ship-types';
 
@@ -61,12 +62,38 @@ export interface HangarComponent {
 	damageMultiplier: number
 }
 
+class HangarComponentImpl extends Component<Int32Array> implements HangarComponent {
+	rate(typeIndex: number) {
+		return this.block[hangarRateIndex(typeIndex)];
+	}
+	level(typeIndex: number) {
+		return this.block[hangarLevelIndex(typeIndex)];
+	}
+	rateBought(typeIndex: number) {
+		return this.block[hangarRateBoughtIndex(typeIndex)];
+	}
+	levelBought(typeIndex: number) {
+		return this.block[hangarLevelBoughtIndex(typeIndex)];
+	}
+	get rateMultiplier() {
+		return this.block[HANGAR_RATE_MULT] / HANGAR_MULT_SCALE;
+	}
+	set rateMultiplier(value: number) {
+		this.block[HANGAR_RATE_MULT] = Math.round(value * HANGAR_MULT_SCALE);
+	}
+	get damageMultiplier() {
+		return this.block[HANGAR_DAMAGE_MULT] / HANGAR_MULT_SCALE;
+	}
+	set damageMultiplier(value: number) {
+		this.block[HANGAR_DAMAGE_MULT] = Math.round(value * HANGAR_MULT_SCALE);
+	}
+}
 export const hangarDefinition: ComponentDefinition<HangarComponent, Int32Array, HangarConfig> = {
 	type: Int32Array,
 	size: HANGAR_SIZE,
 	// Only a station carries a hangar, and a station is the one entity built with a `color`.
 	loadProperties: ['color'],
-	load(entity, memory, config) {
+	toBlock(config) {
 		const values = Array.from({ length: HANGAR_SIZE }, () => 0);
 		values[HANGAR_RATE_MULT] = HANGAR_MULT_SCALE;
 		values[HANGAR_DAMAGE_MULT] = HANGAR_MULT_SCALE;
@@ -82,35 +109,9 @@ export const hangarDefinition: ComponentDefinition<HangarComponent, Int32Array, 
 			}
 		}
 
-		const index = memory.create(values);
-		const block = memory.getBlock(index);
-
-		return {
-			index,
-			rate(typeIndex: number) {
-				return block[hangarRateIndex(typeIndex)];
-			},
-			level(typeIndex: number) {
-				return block[hangarLevelIndex(typeIndex)];
-			},
-			rateBought(typeIndex: number) {
-				return block[hangarRateBoughtIndex(typeIndex)];
-			},
-			levelBought(typeIndex: number) {
-				return block[hangarLevelBoughtIndex(typeIndex)];
-			},
-			get rateMultiplier() {
-				return block[HANGAR_RATE_MULT] / HANGAR_MULT_SCALE;
-			},
-			set rateMultiplier(value: number) {
-				block[HANGAR_RATE_MULT] = Math.round(value * HANGAR_MULT_SCALE);
-			},
-			get damageMultiplier() {
-				return block[HANGAR_DAMAGE_MULT] / HANGAR_MULT_SCALE;
-			},
-			set damageMultiplier(value: number) {
-				block[HANGAR_DAMAGE_MULT] = Math.round(value * HANGAR_MULT_SCALE);
-			},
-		};
+		return values;
+	},
+	attach(entity, memory, index) {
+		return new HangarComponentImpl(memory.getBlock(index), index);
 	},
 };

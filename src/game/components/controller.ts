@@ -1,3 +1,4 @@
+import { Component } from '@daneren2005/shared-memory-ecs';
 import type { ComponentDefinition } from '@daneren2005/shared-memory-ecs';
 
 // controller: a faction/station's identity and economy. `color` identifies the faction, `player` flags the
@@ -26,45 +27,45 @@ export interface ControllerConfig {
 	money?: number
 	player?: boolean
 }
+class ControllerComponentImpl extends Component<Int32Array> implements ControllerComponent {
+	get color() {
+		return this.block[CONTROLLER_COLOR];
+	}
+	set color(value: number) {
+		this.block[CONTROLLER_COLOR] = value;
+	}
+	get money() {
+		return this.block[CONTROLLER_MONEY];
+	}
+	set money(value: number) {
+		this.block[CONTROLLER_MONEY] = value;
+	}
+	get player() {
+		return this.block[CONTROLLER_PLAYER] === 1;
+	}
+	set player(value: boolean) {
+		this.block[CONTROLLER_PLAYER] = value ? 1 : 0;
+	}
+	get moneyMultiplier() {
+		return this.block[CONTROLLER_MONEY_MULT] / CONTROLLER_MULT_SCALE;
+	}
+	set moneyMultiplier(value: number) {
+		this.block[CONTROLLER_MONEY_MULT] = Math.round(value * CONTROLLER_MULT_SCALE);
+	}
+}
 export const controllerDefinition: ComponentDefinition<ControllerComponent, Int32Array, ControllerConfig> = {
 	type: Int32Array,
 	size: 4,
 	loadProperties: ['color'],
-	load(entity, memory, config) {
-		const index = memory.create([
+	toBlock(config) {
+		return [
 			config.color,
 			config.money ?? 0,
 			config.player ? 1 : 0,
 			CONTROLLER_MULT_SCALE,
-		]);
-		const block = memory.getBlock(index);
-
-		return {
-			index,
-			get color() {
-				return block[CONTROLLER_COLOR];
-			},
-			set color(value: number) {
-				block[CONTROLLER_COLOR] = value;
-			},
-			get money() {
-				return block[CONTROLLER_MONEY];
-			},
-			set money(value: number) {
-				block[CONTROLLER_MONEY] = value;
-			},
-			get player() {
-				return block[CONTROLLER_PLAYER] === 1;
-			},
-			set player(value: boolean) {
-				block[CONTROLLER_PLAYER] = value ? 1 : 0;
-			},
-			get moneyMultiplier() {
-				return block[CONTROLLER_MONEY_MULT] / CONTROLLER_MULT_SCALE;
-			},
-			set moneyMultiplier(value: number) {
-				block[CONTROLLER_MONEY_MULT] = Math.round(value * CONTROLLER_MULT_SCALE);
-			},
-		};
+		];
+	},
+	attach(entity, memory, index) {
+		return new ControllerComponentImpl(memory.getBlock(index), index);
 	},
 };

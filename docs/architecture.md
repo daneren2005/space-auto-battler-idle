@@ -45,7 +45,7 @@ Most systems in [src/game/systems/](../src/game/systems/) are three files sharin
 | --- | --- |
 | `x-system.ts` | Creates the `ComponentSystem`: declares `required` components, extra `queries`, `getWorker`, and optional `getInitData`. |
 | `x-update.ts` | The **pure update function** — runs identically on the main thread or in the worker. All the game logic lives here. May attach `preRun` / `entityRemoved` / `init` to the function. |
-| `x.worker.ts` | The worker entry: `createComponentWorker(self, xUpdate)`. Thin. |
+| `x.worker.ts` | The worker entry: `createComponentWorker(self, xUpdate)`. Thin. A system that creates entities off-thread passes the component registry too — `createComponentWorker(self, xUpdate, registry)` — so the worker has each component's `toBlock` (see Worker-side entity creation). That import pulls the registry into the worker bundle (spawn-ship/weapon workers are ~15KB heavier for it), so only entity-creating workers do it. |
 
 A worker can be given one-time setup: the system's `getInitData()` builds a payload that rides the worker's init
 message, and `xUpdate.init(data)` (attached to the update function) runs once in the worker before it reports
@@ -60,7 +60,12 @@ To change what a system *does*, edit `x-update.ts`. To change *which* entities/d
 ### Systems, in run order (see `GameWorld.initSystems`)
 
 1. **update-health-timers** — shield regen / health timers.
-2. **spawn-ship** — stations launch ships per their hangar production lines.
+2. **spawn-ship** — stations launch ships per their hangar production lines. Ships are **created in the worker**
+   from their factory config (`createEntityWorker(world, { type, ...overrides }, callbacks)`): the worker merges the
+   type template, allocates + writes every component block off-thread via each component's `toBlock`, and the main
+   thread adopts the descriptor next frame. Per-ship randomness (velocity, steer force, strafe leg) is rolled in the
+   update with the worker's seeded RNG and passed as config, since `toBlock` can't reach it. **weapon** creates
+   projectiles/drones the same way.
 3. **physics** (library) — movement + collisions. Runs after spawns so a ship exists a frame before
    anything can hit it. Stamps each run's `tick`; the scene reads moves off it.
 4. **interpolation** (library, main-thread only — no worker) — writes a per-frame render position
@@ -127,7 +132,17 @@ Tests live in `__tests__/` folders next to the code (`*.spec.ts`).
 
 - **Components** are declared once in [components/index.ts](../src/game/components/index.ts) (merged with
   `physicsRegistry`). The world derives its typed component map and flat entity config from that registry.
-  A component's data is a typed-array block indexed via exported `*_INDEX` constants.
+  A component's data is a typed-array block indexed via exported `*_INDEX` constants. Each component is defined as
+  two halves so it can be created off-thread: `toBlock(config)` (worker-safe: pure config → block values, no
+  entity/world) and `attach(entity, memory, index)` (builds the accessor over that block). Loading is
+  `attach(entity, memory, memory.create(toBlock(config)))`; a worker calls only `toBlock`, and the main thread runs
+  `attach` when it adopts the entity. A component's own extra allocations (a resource block) go in `attach`, which
+  runs on the main thread in both paths. Creation-time randomness (attack's steer force) rolls in `toBlock` only
+  when it's handed the `entity` — which happens on the main thread (direct placement), never in a worker.
+- **Worker-side entity creation.** `createEntityWorker(world, config, callbacks)` (in a system marked
+  `createsEntities: true`) creates an entity entirely off-thread from a factory config: the worker merges the type
+  template, mints a shared-atomic id, and writes each component's block via `toBlock`; the main thread adopts it next
+  frame. Creation-time randomness lives in the update function (which holds the seeded RNG), not in `toBlock`.
 - **Entity templates** ([data/entities/index.ts](../src/data/entities/index.ts)) are the per-type static
   config the factory stamps entities from. Every buildable ship is stamped by `makeShipConfig(type)`.
 - **Levels → Scenes.** A `LevelConfig` is `{ name, title, bounds, entities, nextLevel? }`. Loading it calls

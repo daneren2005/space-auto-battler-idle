@@ -19,9 +19,9 @@
 		"prepare": "husky"
 	},
 	"dependencies": {
-		"@daneren2005/shared-memory-ecs": "^1.3.0",
-		"@daneren2005/shared-memory-objects": "^1.1.0",
-		"@daneren2005/shared-memory-physics": "^1.2.2",
+		"@daneren2005/shared-memory-ecs": "^1.5.0",
+		"@daneren2005/shared-memory-objects": "^1.2.0",
+		"@daneren2005/shared-memory-physics": "^1.4.0",
 		"phaser": "^3.90.0",
 		"pretty-bytes": "^7.1.1",
 		"rand-seed": "^3.0.0"

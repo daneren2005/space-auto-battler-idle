@@ -1,3 +1,4 @@
+import { Component } from '@daneren2005/shared-memory-ecs';
 import type { ComponentDefinition } from '@daneren2005/shared-memory-ecs';
 
 // combat: contact damage, whether contact detonates, and the kill reward. A `blastRadius` above zero turns a ram
@@ -27,34 +28,34 @@ export interface CombatConfig {
 	blastRadius?: number
 	bounty?: number
 }
+class CombatComponentImpl extends Component<Float32Array> implements CombatComponent {
+	get contactDamage() {
+		return this.block[COMBAT_CONTACT_DAMAGE];
+	}
+	set contactDamage(value: number) {
+		this.block[COMBAT_CONTACT_DAMAGE] = value;
+	}
+	get blastRadius() {
+		return this.block[COMBAT_BLAST_RADIUS];
+	}
+	set blastRadius(value: number) {
+		this.block[COMBAT_BLAST_RADIUS] = value;
+	}
+	get bounty() {
+		return this.block[COMBAT_BOUNTY];
+	}
+	set bounty(value: number) {
+		this.block[COMBAT_BOUNTY] = value;
+	}
+}
 export const combatDefinition: ComponentDefinition<CombatComponent, Float32Array, CombatConfig> = {
 	type: Float32Array,
 	size: 3,
 	loadProperties: ['contactDamage'],
-	load(entity, memory, config) {
-		const index = memory.create([config.contactDamage, config.blastRadius ?? 0, config.bounty ?? DEFAULT_BOUNTY]);
-		const block = memory.getBlock(index);
-
-		return {
-			index,
-			get contactDamage() {
-				return block[COMBAT_CONTACT_DAMAGE];
-			},
-			set contactDamage(value: number) {
-				block[COMBAT_CONTACT_DAMAGE] = value;
-			},
-			get blastRadius() {
-				return block[COMBAT_BLAST_RADIUS];
-			},
-			set blastRadius(value: number) {
-				block[COMBAT_BLAST_RADIUS] = value;
-			},
-			get bounty() {
-				return block[COMBAT_BOUNTY];
-			},
-			set bounty(value: number) {
-				block[COMBAT_BOUNTY] = value;
-			},
-		};
+	toBlock(config) {
+		return [config.contactDamage, config.blastRadius ?? 0, config.bounty ?? DEFAULT_BOUNTY];
+	},
+	attach(entity, memory, index) {
+		return new CombatComponentImpl(memory.getBlock(index), index);
 	},
 };

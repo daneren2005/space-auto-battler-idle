@@ -1,3 +1,4 @@
+import { Component } from '@daneren2005/shared-memory-ecs';
 import type { ComponentDefinition } from '@daneren2005/shared-memory-ecs';
 
 // health: shields + the timers that regenerate them and gate incoming damage. Current shields are the only
@@ -28,53 +29,53 @@ export interface HealthConfig {
 export interface HealthSerialization {
 	shields?: number
 }
+class HealthComponentImpl extends Component<Float32Array> implements HealthComponent {
+	get shields() {
+		return this.block[HEALTH_SHIELDS];
+	}
+	set shields(value: number) {
+		this.block[HEALTH_SHIELDS] = value;
+	}
+	get maxShields() {
+		return this.block[HEALTH_MAX_SHIELDS];
+	}
+	set maxShields(value: number) {
+		this.block[HEALTH_MAX_SHIELDS] = value;
+	}
+	get timeToRegenerateShields() {
+		return this.block[HEALTH_TIME_TO_REGEN];
+	}
+	set timeToRegenerateShields(value: number) {
+		this.block[HEALTH_TIME_TO_REGEN] = value;
+	}
+	get timeSinceShieldRegeneration() {
+		return this.block[HEALTH_TIME_SINCE_REGEN];
+	}
+	set timeSinceShieldRegeneration(value: number) {
+		this.block[HEALTH_TIME_SINCE_REGEN] = value;
+	}
+	get timeSinceTakenDamage() {
+		return this.block[HEALTH_TIME_SINCE_DAMAGE];
+	}
+	set timeSinceTakenDamage(value: number) {
+		this.block[HEALTH_TIME_SINCE_DAMAGE] = value;
+	}
+	get damageCooldown() {
+		return this.block[HEALTH_DAMAGE_COOLDOWN];
+	}
+	set damageCooldown(value: number) {
+		this.block[HEALTH_DAMAGE_COOLDOWN] = value;
+	}
+}
 export const healthDefinition: ComponentDefinition<HealthComponent, Float32Array, HealthConfig, HealthSerialization> = {
 	type: Float32Array,
 	size: 6,
 	loadProperties: ['maxShields'],
-	load(entity, memory, config) {
-		const index = memory.create([config.shields ?? config.maxShields, config.maxShields, config.timeToRegenerateShields, 0, 0, config.damageCooldown]);
-		const block = memory.getBlock(index);
-
-		return {
-			index,
-			get shields() {
-				return block[HEALTH_SHIELDS];
-			},
-			set shields(value: number) {
-				block[HEALTH_SHIELDS] = value;
-			},
-			get maxShields() {
-				return block[HEALTH_MAX_SHIELDS];
-			},
-			set maxShields(value: number) {
-				block[HEALTH_MAX_SHIELDS] = value;
-			},
-			get timeToRegenerateShields() {
-				return block[HEALTH_TIME_TO_REGEN];
-			},
-			set timeToRegenerateShields(value: number) {
-				block[HEALTH_TIME_TO_REGEN] = value;
-			},
-			get timeSinceShieldRegeneration() {
-				return block[HEALTH_TIME_SINCE_REGEN];
-			},
-			set timeSinceShieldRegeneration(value: number) {
-				block[HEALTH_TIME_SINCE_REGEN] = value;
-			},
-			get timeSinceTakenDamage() {
-				return block[HEALTH_TIME_SINCE_DAMAGE];
-			},
-			set timeSinceTakenDamage(value: number) {
-				block[HEALTH_TIME_SINCE_DAMAGE] = value;
-			},
-			get damageCooldown() {
-				return block[HEALTH_DAMAGE_COOLDOWN];
-			},
-			set damageCooldown(value: number) {
-				block[HEALTH_DAMAGE_COOLDOWN] = value;
-			},
-		};
+	toBlock(config) {
+		return [config.shields ?? config.maxShields, config.maxShields, config.timeToRegenerateShields, 0, 0, config.damageCooldown];
+	},
+	attach(entity, memory, index) {
+		return new HealthComponentImpl(memory.getBlock(index), index);
 	},
 	save(component) {
 		return { shields: component.shields };

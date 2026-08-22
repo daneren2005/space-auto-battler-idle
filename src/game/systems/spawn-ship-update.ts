@@ -5,6 +5,7 @@ import type { Components, ComponentArrays } from '../components';
 import computeAngle from '@/math/compute-angle';
 import { SHIP_TYPES, SHIP_TYPE_INDEX, SHIP_TYPE_DEFS, shieldsForLevel, contactDamageForLevel, weaponDamageForLevel, projectileCountForLevel } from '@/data/ship-types';
 import { hangarRateIndex, hangarLevelIndex, hangarProgressIndex, HANGAR_RATE_MULT, HANGAR_DAMAGE_MULT, HANGAR_MULT_SCALE } from '../components/hangar';
+import { rollSteerForce, STRAFE_LEG_SECONDS } from '../components/attack';
 import { seedRand, type SeededWorld } from './seeded-world';
 
 // A freshly-spawned ship's random initial velocity magnitude, in pixels/second.
@@ -15,8 +16,10 @@ const SHIP_SPEED = 100;
 const PROGRESS_PER_SHIP = 1_000_000;
 
 // Each run a station banks `elapsed * rate` per production line and launches however many whole ships that buys,
-// carrying the fraction over so the average rate holds. Each ship is stamped with its type's level-scaled
-// shields/damage. Creation can't happen in a worker, so createEntityWorker buffers the config for next frame.
+// carrying the fraction over so the average rate holds. Each ship is created right here in the worker from its
+// factory config (type template + the per-ship overrides below): createEntityWorker allocates + writes its blocks
+// off-thread, the main thread adopts it next frame. Per-ship randomness (velocity, steer force, strafe leg) is
+// rolled here with the worker's seeded RNG, since a component's toBlock() can't reach it.
 export const spawnShipUpdate: EntityUpdateFunction<Components, Pick<ComponentArrays, 'hangar' | 'transform' | 'body'>, SeededWorld> = (world, entityId, components, queries, callbacks) => {
 	const hangar = components.hangar;
 	const transform = components.transform;
@@ -62,13 +65,18 @@ export const spawnShipUpdate: EntityUpdateFunction<Components, Pick<ComponentArr
 		const weaponDamage = def.weapon ? weaponDamageForLevel(def, level) * damageMultiplier : undefined;
 		// Any weapon whose volley (or a Carrier's drone launch) grows with level is stamped its level-scaled count.
 		const weaponProjectileCount = def.weapon ? projectileCountForLevel(def, level) : undefined;
+		const strafes = !!def.weapon?.strafe;
 
 		for(let i = 0; i < spawning; i++) {
 			// Rolled per ship, so a batch leaves as a spread rather than a convoy.
 			const velocityX = (world.rand.next() > 0.5 ? -1 : 1) * world.rand.next() * SHIP_SPEED;
 			const velocityY = (world.rand.next() > 0.5 ? -1 : 1) * world.rand.next() * SHIP_SPEED;
+			// Per-ship steer force + strafe leg, rolled here (the seeded RNG lives on the worker) and passed as the
+			// final values; attack's toBlock reads them as-is (see AttackConfig).
+			const steerForce = rollSteerForce(def.steerForce, def.steerBonus, world.rand);
+			const strafeTimer = strafes ? (world.rand.next() < 0.5 ? -1 : 1) * world.rand.next() * STRAFE_LEG_SECONDS : 0;
 
-			createEntityWorker({
+			createEntityWorker(world, {
 				type,
 				x,
 				y,
@@ -82,6 +90,8 @@ export const spawnShipUpdate: EntityUpdateFunction<Components, Pick<ComponentArr
 				weaponProjectileCount,
 				collideCategory,
 				collideMask,
+				steerForce,
+				strafeTimer,
 			}, callbacks);
 		}
 	}

@@ -18,8 +18,9 @@ type Scratch = ComponentSystemWorld & {
 	positionByEid?: Record<number, TargetPosition>
 };
 
-// Each armed ship fires at its already-picked target when it's in range and the cooldown has elapsed.
-// Creation can't happen in a worker, so createEntityWorker buffers each shot for next frame (like spawn-ship).
+// Each armed ship fires at its already-picked target when it's in range and the cooldown has elapsed. Each shot
+// (projectile, or a Carrier's drone) is created off-thread from its factory config; the main thread adopts it next
+// frame.
 export const weaponUpdate: EntityUpdateFunction<Components, Pick<ComponentArrays, 'weapon' | 'attack' | 'transform' | 'body' | 'controlled'>> = (world, entityId, components, queries, callbacks) => {
 	const scratch = world as Scratch;
 	const weapon = components.weapon;
@@ -53,12 +54,13 @@ export const weaponUpdate: EntityUpdateFunction<Components, Pick<ComponentArrays
 	}
 	weapon[WEAPON_TIME_SINCE_FIRED] = 0;
 
-	fireVolley(x, y, dx, dy, weapon, components.body, components.controlled[CONTROLLED_OWNER], target, callbacks);
+	fireVolley(world, x, y, dx, dy, weapon, components.body, components.controlled[CONTROLLED_OWNER], target, callbacks);
 };
 
 // Launches one volley: `count` shots fanned across `spread`, aimed from (x, y) at the target. Shots inherit the
 // ship's collide category/mask and owner. A Carrier launches drone sub-ships in the same fan instead.
 function fireVolley(
+	world: ComponentSystemWorld,
 	x: number,
 	y: number,
 	dx: number,
@@ -91,7 +93,7 @@ function fireVolley(
 
 		if(spawnsDrones) {
 			// A drone is a full ship: it launches on the fan heading, then targets and rams with its own stats.
-			createEntityWorker({
+			createEntityWorker(world, {
 				type: 'drone',
 				x, y,
 				owner,
@@ -103,7 +105,7 @@ function fireVolley(
 			continue;
 		}
 
-		createEntityWorker({
+		createEntityWorker(world, {
 			type: 'projectile',
 			x, y,
 			owner,

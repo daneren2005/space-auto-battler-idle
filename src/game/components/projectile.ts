@@ -1,3 +1,4 @@
+import { Component } from '@daneren2005/shared-memory-ecs';
 import type { ComponentDefinition } from '@daneren2005/shared-memory-ecs';
 
 // projectile: marks a fired shot. These are sensor bodies that deal their combat `contactDamage` to the first
@@ -22,34 +23,34 @@ export interface ProjectileConfig {
 	target?: number
 	turn?: number
 }
+class ProjectileComponentImpl extends Component<Float32Array> implements ProjectileComponent {
+	get remainingLifetime() {
+		return this.block[PROJECTILE_REMAINING_LIFETIME];
+	}
+	set remainingLifetime(value: number) {
+		this.block[PROJECTILE_REMAINING_LIFETIME] = value;
+	}
+	get target() {
+		return this.block[PROJECTILE_TARGET];
+	}
+	set target(value: number) {
+		this.block[PROJECTILE_TARGET] = value;
+	}
+	get turn() {
+		return this.block[PROJECTILE_TURN];
+	}
+	set turn(value: number) {
+		this.block[PROJECTILE_TURN] = value;
+	}
+}
 export const projectileDefinition: ComponentDefinition<ProjectileComponent, Float32Array, ProjectileConfig> = {
 	type: Float32Array,
 	size: 3,
 	loadProperties: ['remainingLifetime'],
-	load(entity, memory, config) {
-		const index = memory.create([config.remainingLifetime, config.target ?? 0, config.turn ?? 0]);
-		const block = memory.getBlock(index);
-
-		return {
-			index,
-			get remainingLifetime() {
-				return block[PROJECTILE_REMAINING_LIFETIME];
-			},
-			set remainingLifetime(value: number) {
-				block[PROJECTILE_REMAINING_LIFETIME] = value;
-			},
-			get target() {
-				return block[PROJECTILE_TARGET];
-			},
-			set target(value: number) {
-				block[PROJECTILE_TARGET] = value;
-			},
-			get turn() {
-				return block[PROJECTILE_TURN];
-			},
-			set turn(value: number) {
-				block[PROJECTILE_TURN] = value;
-			},
-		};
+	toBlock(config) {
+		return [config.remainingLifetime, config.target ?? 0, config.turn ?? 0];
+	},
+	attach(entity, memory, index) {
+		return new ProjectileComponentImpl(memory.getBlock(index), index);
 	},
 };

@@ -12,6 +12,8 @@ export function createSpawnShipSystem(world: BaseWorld<typeof registry>) {
 		// body is required because a spawned ship inherits its station's collide category + mask.
 		required: ['hangar', 'transform', 'body'],
 		updateFunction: spawnShipUpdate,
+		// Ships are created off-thread from factory configs, so this worker gets the templates shipped on load.
+		createsEntities: true,
 		getWorker: () => new SpawnShipWorker(),
 		getInitData: () => ({ seed: readSeed(world) }),
 	});

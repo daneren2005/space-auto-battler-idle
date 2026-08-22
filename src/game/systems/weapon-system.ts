@@ -10,6 +10,8 @@ export function createWeaponSystem(world: BaseWorld<typeof registry>) {
 		name: 'weaponSystem',
 		required: ['weapon', 'attack', 'transform', 'body', 'controlled'],
 		updateFunction: weaponUpdate,
+		// Projectiles + drones are created off-thread from factory configs.
+		createsEntities: true,
 		getWorker: () => new WeaponWorker(),
 		queries: {
 			targets: { required: ['transform'] },

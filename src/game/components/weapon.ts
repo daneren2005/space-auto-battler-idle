@@ -1,3 +1,4 @@
+import { Component } from '@daneren2005/shared-memory-ecs';
 import type { ComponentDefinition } from '@daneren2005/shared-memory-ecs';
 
 // weapon: everything an armed ship needs to fire. Only armed types carry it (the weapon query requires it). All
@@ -49,13 +50,75 @@ export interface WeaponConfig {
 	// Per-spawn override of the volley's shot/drone count, for a type whose count scales with level (the Carrier).
 	weaponProjectileCount?: number
 }
+class WeaponComponentImpl extends Component<Float32Array> implements WeaponComponent {
+	get range() {
+		return this.block[WEAPON_RANGE];
+	}
+	set range(value: number) {
+		this.block[WEAPON_RANGE] = value;
+	}
+	get fireInterval() {
+		return this.block[WEAPON_FIRE_INTERVAL];
+	}
+	set fireInterval(value: number) {
+		this.block[WEAPON_FIRE_INTERVAL] = value;
+	}
+	get projectileCount() {
+		return this.block[WEAPON_PROJECTILE_COUNT];
+	}
+	set projectileCount(value: number) {
+		this.block[WEAPON_PROJECTILE_COUNT] = value;
+	}
+	get spread() {
+		return this.block[WEAPON_SPREAD];
+	}
+	set spread(value: number) {
+		this.block[WEAPON_SPREAD] = value;
+	}
+	get projectileSpeed() {
+		return this.block[WEAPON_PROJECTILE_SPEED];
+	}
+	set projectileSpeed(value: number) {
+		this.block[WEAPON_PROJECTILE_SPEED] = value;
+	}
+	get damage() {
+		return this.block[WEAPON_DAMAGE];
+	}
+	set damage(value: number) {
+		this.block[WEAPON_DAMAGE] = value;
+	}
+	get homing() {
+		return this.block[WEAPON_HOMING] === 1;
+	}
+	set homing(value: boolean) {
+		this.block[WEAPON_HOMING] = value ? 1 : 0;
+	}
+	get homingTurn() {
+		return this.block[WEAPON_HOMING_TURN];
+	}
+	set homingTurn(value: number) {
+		this.block[WEAPON_HOMING_TURN] = value;
+	}
+	get spawnsDrones() {
+		return this.block[WEAPON_SPAWNS_DRONES] === 1;
+	}
+	set spawnsDrones(value: boolean) {
+		this.block[WEAPON_SPAWNS_DRONES] = value ? 1 : 0;
+	}
+	get timeSinceFired() {
+		return this.block[WEAPON_TIME_SINCE_FIRED];
+	}
+	set timeSinceFired(value: number) {
+		this.block[WEAPON_TIME_SINCE_FIRED] = value;
+	}
+}
 export const weaponDefinition: ComponentDefinition<WeaponComponent, Float32Array, WeaponConfig> = {
 	type: Float32Array,
 	size: 10,
 	loadProperties: ['weapon'],
-	load(entity, memory, config) {
+	toBlock(config) {
 		const weapon = config.weapon;
-		const index = memory.create([
+		return [
 			weapon.range,
 			weapon.fireInterval,
 			// Spawn worker stamps the level-scaled count; a directly-placed ship uses the def's own.
@@ -69,71 +132,9 @@ export const weaponDefinition: ComponentDefinition<WeaponComponent, Float32Array
 			weapon.spawnsDrones ? 1 : 0,
 			// Ready to fire the moment it first sees a target.
 			weapon.fireInterval,
-		]);
-		const block = memory.getBlock(index);
-
-		return {
-			index,
-			get range() {
-				return block[WEAPON_RANGE];
-			},
-			set range(value: number) {
-				block[WEAPON_RANGE] = value;
-			},
-			get fireInterval() {
-				return block[WEAPON_FIRE_INTERVAL];
-			},
-			set fireInterval(value: number) {
-				block[WEAPON_FIRE_INTERVAL] = value;
-			},
-			get projectileCount() {
-				return block[WEAPON_PROJECTILE_COUNT];
-			},
-			set projectileCount(value: number) {
-				block[WEAPON_PROJECTILE_COUNT] = value;
-			},
-			get spread() {
-				return block[WEAPON_SPREAD];
-			},
-			set spread(value: number) {
-				block[WEAPON_SPREAD] = value;
-			},
-			get projectileSpeed() {
-				return block[WEAPON_PROJECTILE_SPEED];
-			},
-			set projectileSpeed(value: number) {
-				block[WEAPON_PROJECTILE_SPEED] = value;
-			},
-			get damage() {
-				return block[WEAPON_DAMAGE];
-			},
-			set damage(value: number) {
-				block[WEAPON_DAMAGE] = value;
-			},
-			get homing() {
-				return block[WEAPON_HOMING] === 1;
-			},
-			set homing(value: boolean) {
-				block[WEAPON_HOMING] = value ? 1 : 0;
-			},
-			get homingTurn() {
-				return block[WEAPON_HOMING_TURN];
-			},
-			set homingTurn(value: number) {
-				block[WEAPON_HOMING_TURN] = value;
-			},
-			get spawnsDrones() {
-				return block[WEAPON_SPAWNS_DRONES] === 1;
-			},
-			set spawnsDrones(value: boolean) {
-				block[WEAPON_SPAWNS_DRONES] = value ? 1 : 0;
-			},
-			get timeSinceFired() {
-				return block[WEAPON_TIME_SINCE_FIRED];
-			},
-			set timeSinceFired(value: number) {
-				block[WEAPON_TIME_SINCE_FIRED] = value;
-			},
-		};
+		];
+	},
+	attach(entity, memory, index) {
+		return new WeaponComponentImpl(memory.getBlock(index), index);
 	},
 };

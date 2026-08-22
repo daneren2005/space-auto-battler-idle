@@ -1,4 +1,6 @@
 import { createComponentWorker } from '@daneren2005/shared-memory-ecs/worker';
 import { weaponUpdate } from './weapon-update';
+import { registry } from '../components';
 
-createComponentWorker(self, weaponUpdate);
+// The registry is passed so this worker has each component's toBlock() to build projectiles/drones off-thread.
+createComponentWorker(self, weaponUpdate, registry);

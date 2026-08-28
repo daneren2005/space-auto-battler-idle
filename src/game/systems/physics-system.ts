@@ -1,5 +1,5 @@
 import { PhysicsSystem } from '@daneren2005/shared-memory-physics';
-import type { BaseWorld } from '@daneren2005/shared-memory-ecs';
+import type { PhysicalWorld } from '@daneren2005/shared-memory-physics';
 import type { Components, registry } from '../components';
 import type { CustomSystemWorld } from './game-component-system';
 import { readBounds } from './game-component-system';
@@ -17,7 +17,7 @@ export class GamePhysicsSystem extends PhysicsSystem<Components, GamePhysicsComp
 }
 
 // Moves every ship, keeps it on the map, and resolves collisions/damage/deaths/bounties against where it lands.
-export function createPhysicsSystem(world: BaseWorld<typeof registry>): GamePhysicsSystem {
+export function createPhysicsSystem(world: PhysicalWorld<typeof registry>): GamePhysicsSystem {
 	return new GamePhysicsSystem(world, {
 		name: 'physicsSystem',
 		// The same update the worker hands to createComponentWorker, so both backends behave identically.

@@ -13,6 +13,7 @@ import {
 	VELOCITY_Y_INDEX,
 	BODY_CATEGORY_INDEX,
 	BODY_MASK_INDEX,
+	updateSpatialMap,
 } from '@daneren2005/shared-memory-physics';
 import type {
 	CollisionEntity,
@@ -69,8 +70,8 @@ export const physicsUpdate: PhysicsUpdateFunction<Components, GamePhysicsCompone
 	(world: CustomSystemWorld, entityId: number, components: GamePhysicsComponents, queries: EntityQueryComponents<Components>, callbacks: ComponentSystemCallbacks<Components>) => {
 		physics(world, entityId, components, queries, callbacks);
 		// A projectile expires on its lifetime (see update-projectiles) rather than bouncing.
-		if(!components.projectile) {
-			bounceOffWalls(world, components);
+		if(!components.projectile && bounceOffWalls(world, components)) {
+			updateSpatialMap(world, entityId, components);
 		}
 	},
 	{
@@ -114,7 +115,7 @@ export const physicsUpdate: PhysicsUpdateFunction<Components, GamePhysicsCompone
 );
 
 // Crossing an edge flips the velocity off that wall and re-faces the ship along the new heading.
-function bounceOffWalls(world: CustomSystemWorld, components: GamePhysicsComponents) {
+function bounceOffWalls(world: CustomSystemWorld, components: GamePhysicsComponents): boolean {
 	const transform = components.transform;
 	const velocity = components.velocity;
 	const bounds = world.bounds;
@@ -153,6 +154,8 @@ function bounceOffWalls(world: CustomSystemWorld, components: GamePhysicsCompone
 	if(bounced && (velocity[VELOCITY_X_INDEX] !== 0 || velocity[VELOCITY_Y_INDEX] !== 0)) {
 		transform[TRANSFORM_ANGLE_INDEX] = computeAngle(velocity[VELOCITY_X_INDEX], velocity[VELOCITY_Y_INDEX]);
 	}
+
+	return bounced;
 }
 
 // One ship ran into an enemy. Physics already reflected the velocity; this re-faces `self`, exchanges damage

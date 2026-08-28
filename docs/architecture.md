@@ -16,7 +16,7 @@ drops back a level. Everything the player earned carries forward.
 - **Phaser 3** — rendering, scenes, input, camera, asset loading. Renders only; it does not own game state.
 - **`@daneren2005/shared-memory-ecs`** — the ECS: `BaseWorld`, `ComponentSystem`, entity factory,
   component workers, `PerformanceTiming`.
-- **`@daneren2005/shared-memory-physics`** — transform/velocity/body components + the physics system.
+- **`@daneren2005/shared-memory-physics`** — transform/velocity/body components, the physics system, and the live shared spatial map.
 - **`@daneren2005/shared-memory-objects`** — low-level typed-array/shared-memory primitives.
 - These three `@daneren2005/*` packages are **sibling checkouts**, not just npm deps (see auto-memory
   `shared-memory-packages-are-sibling-checkouts`). Worker code must import them via their `/worker` and
@@ -34,7 +34,7 @@ serialization across the boundary.
 
 `GameWorld` ([src/game/entities/game-world.ts](../src/game/entities/game-world.ts)) is where "what this
 game is made of" is declared. It hands the component registry + entity templates to the library's
-`BaseWorld` and wires up the systems. Almost all heavy lifting (memory allocation, load/save,
+`PhysicalWorld` and wires up the systems. Almost all heavy lifting (memory allocation, load/save,
 running systems on/off-thread) is the library's; this class only composes it.
 
 ### The system triple
@@ -67,7 +67,8 @@ To change what a system *does*, edit `x-update.ts`. To change *which* entities/d
    update with the worker's seeded RNG and passed as config, since `toBlock` can't reach it. **weapon** creates
    projectiles/drones the same way.
 3. **physics** (library) — movement + collisions. Runs after spawns so a ship exists a frame before
-   anything can hit it. Stamps each run's `tick`; the scene reads moves off it.
+   anything can hit it. Stamps each run's `tick`, keeps `PhysicalWorld.spatialMap` synchronized from the worker,
+   and retains Flatbush for collision broadphase performance; the scene reads moves off it.
 4. **interpolation** (library, main-thread only — no worker) — writes a per-frame render position
    between physics steps so 20Hz physics draws smoothly at 60fps.
 5. **target-enemy** — each ship picks a target.
@@ -145,6 +146,12 @@ Tests live in `__tests__/` folders next to the code (`*.spec.ts`).
   frame. Creation-time randomness lives in the update function (which holds the seeded RNG), not in `toBlock`.
 - **Entity templates** ([data/entities/index.ts](../src/data/entities/index.ts)) are the per-type static
   config the factory stamps entities from. Every buildable ship is stamped by `makeShipConfig(type)`.
+- **Spatial indexes.** `GameWorld` extends the physics package's `PhysicalWorld`, whose live shared map follows
+  entity lifecycle and every finalized physics move. It is available for occasional client/worker queries without
+  a rebuild. The query-heavy target-enemy worker deliberately still builds a Flatbush `SpatialIndex` per run: it
+  performs one nearest search per ship, where the packed snapshot is faster than the mutable shared map. The live
+  map's 16,384 entity/slot records and 32,768 buckets are allocated before workers clone the heap, avoiding
+  cross-thread heap growth during the stress workload; its 100-unit cells keep the slot budget near one per ship.
 - **Levels → Scenes.** A `LevelConfig` is `{ name, title, bounds, entities, nextLevel? }`. Loading it calls
   `world.load({ entities, bounds })`, which frees old entities and adds new ones **in place** — no page
   reload; workers resync from the add/remove deltas (memory `in-place-level-reload`). Between levels a short

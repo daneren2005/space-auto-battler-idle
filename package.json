@@ -14,13 +14,14 @@
 		"start": "npm run dev",
 		"test:unit": "vitest run",
 		"test:e2e": "playwright test",
+		"benchmark:stress": "node --experimental-transform-types --import ./scripts/worker-threads/register-worker-alias.mjs scripts/stress-benchmark.ts",
 		"report:balance": "node --import ./scripts/register-alias.mjs scripts/level-balance.ts",
 		"report:ai-run": "node --experimental-transform-types --import ./scripts/register-alias.mjs scripts/ai-run.ts",
 		"prepare": "husky"
 	},
 	"dependencies": {
-		"@daneren2005/shared-memory-ecs": "^1.5.0",
-		"@daneren2005/shared-memory-objects": "^1.2.0",
+		"@daneren2005/shared-memory-ecs": "^1.5.1",
+		"@daneren2005/shared-memory-objects": "^1.4.0",
 		"@daneren2005/shared-memory-physics": "^1.4.0",
 		"phaser": "^3.90.0",
 		"pretty-bytes": "^7.1.1",

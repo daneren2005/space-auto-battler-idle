@@ -1,5 +1,5 @@
 import { killEntityWorker } from '@daneren2005/shared-memory-ecs/worker';
-import type { ComponentSystemWorld, EntityUpdateFunction } from '@daneren2005/shared-memory-ecs';
+import type { EntityWorkerSystemWorld, EntityUpdateFunction } from '@daneren2005/shared-memory-ecs';
 import { TRANSFORM_X_INDEX, TRANSFORM_Y_INDEX, TRANSFORM_ANGLE_INDEX, VELOCITY_X_INDEX, VELOCITY_Y_INDEX } from '@daneren2005/shared-memory-physics';
 import type { Components, ComponentArrays } from '../components';
 import computeAngle from '@/math/compute-angle';
@@ -15,7 +15,7 @@ interface TargetPosition {
 	x: number
 	y: number
 }
-type Scratch = ComponentSystemWorld & {
+type Scratch = EntityWorkerSystemWorld & {
 	positionByEid?: Record<number, TargetPosition>
 };
 

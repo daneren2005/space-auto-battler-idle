@@ -14,8 +14,8 @@ drops back a level. Everything the player earned carries forward.
 ## Tech stack
 
 - **Phaser 3** — rendering, scenes, input, camera, asset loading. Renders only; it does not own game state.
-- **`@daneren2005/shared-memory-ecs`** — the ECS: `BaseWorld`, `ComponentSystem`, entity factory,
-  component workers, `PerformanceTiming`.
+- **`@daneren2005/shared-memory-ecs`** — the ECS: `BaseWorld`, `EntityWorkerSystem`, entity factory,
+  entity-system workers, `PerformanceTiming`.
 - **`@daneren2005/shared-memory-physics`** — transform/velocity/body components, the physics system, and the live shared spatial map.
 - **`@daneren2005/shared-memory-objects`** — low-level typed-array/shared-memory primitives.
 - These three `@daneren2005/*` packages are **sibling checkouts**, not just npm deps (see auto-memory
@@ -43,9 +43,9 @@ Most systems in [src/game/systems/](../src/game/systems/) are three files sharin
 
 | File | Role |
 | --- | --- |
-| `x-system.ts` | Creates the `ComponentSystem`: declares `required` components, extra `queries`, `getWorker`, and optional `getInitData`. |
+| `x-system.ts` | Creates the `EntityWorkerSystem`: declares `required` components, extra `queries`, `getWorker`, and optional `getInitData`. |
 | `x-update.ts` | The **pure update function** — runs identically on the main thread or in the worker. All the game logic lives here. May attach `preRun` / `entityRemoved` / `init` to the function. |
-| `x.worker.ts` | The worker entry: `createComponentWorker(self, xUpdate)`. Thin. A system that creates entities off-thread passes the component registry too — `createComponentWorker(self, xUpdate, registry)` — so the worker has each component's `toBlock` (see Worker-side entity creation). That import pulls the registry into the worker bundle (spawn-ship/weapon workers are ~15KB heavier for it), so only entity-creating workers do it. |
+| `x.worker.ts` | The worker entry: `createEntitySystemWorker(self, xUpdate)`. Thin. A system that creates entities off-thread passes the component registry too — `createEntitySystemWorker(self, xUpdate, registry)` — so the worker has each component's `toBlock` (see Worker-side entity creation). That import pulls the registry into the worker bundle (spawn-ship/weapon workers are ~15KB heavier for it), so only entity-creating workers do it. |
 
 A worker can be given one-time setup: the system's `getInitData()` builds a payload that rides the worker's init
 message, and `xUpdate.init(data)` (attached to the update function) runs once in the worker before it reports
@@ -53,8 +53,8 @@ loaded. Whatever `init` returns is merged onto the per-run `world` every run —
 persist across runs inside the worker (see the seeded RNG under Determinism).
 
 To change what a system *does*, edit `x-update.ts`. To change *which* entities/data it sees, edit
-`x-system.ts`. All game systems extend `GameComponentSystem`
-([game-component-system.ts](../src/game/systems/game-component-system.ts)), which only adds the world's
+`x-system.ts`. All game systems extend `GameEntityWorkerSystem`
+([game-entity-worker-system.ts](../src/game/systems/game-entity-worker-system.ts)), which only adds the world's
 `bounds` to the per-run data so update functions can keep entities on screen.
 
 ### Systems, in run order (see `GameWorld.initSystems`)
@@ -106,7 +106,7 @@ src/
     ship-test.ts, player-carry.ts, format-stats.ts
     components/           One file per component (health, controller, hangar, controlled, attack, combat, weapon, projectile).
                           index.ts merges them with the physics registry into the world's component map.
-    systems/              The system triples (see above) + game-component-system.ts.
+    systems/              The system triples (see above) + game-entity-worker-system.ts.
     entities/
       game-world.ts       GameWorld: registry + templates + system wiring.
       entity-list.ts

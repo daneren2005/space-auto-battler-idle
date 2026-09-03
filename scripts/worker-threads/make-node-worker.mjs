@@ -9,7 +9,7 @@ import { Worker } from 'node:worker_threads';
 const bootstrapUrl = new URL('./node-worker-bootstrap.mjs', import.meta.url);
 
 export default function makeNodeWorker(targetUrl) {
-	return class NodeComponentWorker {
+	return class NodeEntitySystemWorker {
 		constructor() {
 			this.onmessage = null;
 			this.worker = new Worker(bootstrapUrl, { workerData: { targetUrl } });

@@ -1,5 +1,5 @@
 import type { Config } from '@/game/components';
-import type { Bounds } from '@/game/systems/game-component-system';
+import type { Bounds } from '@/game/systems/game-entity-worker-system';
 
 // A hand-authored level, loaded into the world as a Scene (`{ entities, bounds }`). `entities` are full configs
 // with explicit positions; a station also carries `color`, `player` and its `ships` roster. `nextLevel` names

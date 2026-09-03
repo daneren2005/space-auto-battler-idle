@@ -1,4 +1,4 @@
-import type { ComponentSystemWorld, EntityUpdateFunction } from '@daneren2005/shared-memory-ecs';
+import type { EntityWorkerSystemWorld, EntityUpdateFunction } from '@daneren2005/shared-memory-ecs';
 import { SpatialIndex, TRANSFORM_X_INDEX, TRANSFORM_Y_INDEX, TRANSFORM_WIDTH_INDEX, TRANSFORM_HEIGHT_INDEX } from '@daneren2005/shared-memory-physics';
 import type { Components, ComponentArrays } from '../components';
 import euclideanDistance from '@/math/euclidean-distance';
@@ -14,7 +14,7 @@ interface StationDatum {
 	color: number
 }
 // Per-run scratch computed once in preRun and read by every per-entity update in the same run.
-type Scratch = ComponentSystemWorld & {
+type Scratch = EntityWorkerSystemWorld & {
 	spatialIndex?: SpatialIndex
 	colorByEid?: Record<number, number>
 	stations?: Array<StationDatum>

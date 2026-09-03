@@ -1,5 +1,5 @@
 import Rand from 'rand-seed';
-import type { CustomSystemWorld } from './game-component-system';
+import type { CustomSystemWorld } from './game-entity-worker-system';
 
 // A per-run world with the worker's persistent seeded RNG merged in
 export interface SeededWorld extends CustomSystemWorld {

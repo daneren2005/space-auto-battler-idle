@@ -1,4 +1,4 @@
-import type { ComponentSystemWorld, EntityUpdateFunction } from '@daneren2005/shared-memory-ecs';
+import type { EntityWorkerSystemWorld, EntityUpdateFunction } from '@daneren2005/shared-memory-ecs';
 import { TRANSFORM_X_INDEX, TRANSFORM_Y_INDEX, TRANSFORM_ANGLE_INDEX, VELOCITY_X_INDEX, VELOCITY_Y_INDEX } from '@daneren2005/shared-memory-physics';
 import type { Components, ComponentArrays } from '../components';
 import computeAngle from '@/math/compute-angle';
@@ -12,7 +12,7 @@ interface TargetPosition {
 	x: number
 	y: number
 }
-type Scratch = ComponentSystemWorld & {
+type Scratch = EntityWorkerSystemWorld & {
 	positionByEid?: Record<number, TargetPosition>
 };
 
@@ -74,7 +74,7 @@ export const moveToTargetUpdate: EntityUpdateFunction<Components, Pick<Component
 // Slides perpendicular to the target, reversing each leg, easing back toward the standoff radius as it weaves.
 // Faces the way it moves, so its shots leave out the side (the Missile Frigate).
 function strafe(
-	world: ComponentSystemWorld,
+	world: EntityWorkerSystemWorld,
 	velocity: Float32Array,
 	transform: Float32Array,
 	attack: Float32Array,

@@ -1,5 +1,5 @@
 import { createEntityWorker } from '@daneren2005/shared-memory-ecs/worker';
-import type { ComponentSystemWorld, EntityUpdateFunction } from '@daneren2005/shared-memory-ecs';
+import type { EntityWorkerSystemWorld, EntityUpdateFunction } from '@daneren2005/shared-memory-ecs';
 import { TRANSFORM_X_INDEX, TRANSFORM_Y_INDEX, BODY_CATEGORY_INDEX, BODY_MASK_INDEX } from '@daneren2005/shared-memory-physics';
 import type { Components, ComponentArrays } from '../components';
 import { ATTACK_TARGET } from '../components/attack';
@@ -14,7 +14,7 @@ interface TargetPosition {
 	x: number
 	y: number
 }
-type Scratch = ComponentSystemWorld & {
+type Scratch = EntityWorkerSystemWorld & {
 	positionByEid?: Record<number, TargetPosition>
 };
 
@@ -60,7 +60,7 @@ export const weaponUpdate: EntityUpdateFunction<Components, Pick<ComponentArrays
 // Launches one volley: `count` shots fanned across `spread`, aimed from (x, y) at the target. Shots inherit the
 // ship's collide category/mask and owner. A Carrier launches drone sub-ships in the same fan instead.
 function fireVolley(
-	world: ComponentSystemWorld,
+	world: EntityWorkerSystemWorld,
 	x: number,
 	y: number,
 	dx: number,

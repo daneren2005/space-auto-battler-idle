@@ -21,9 +21,9 @@ import type {
 	PhysicsUpdateComponents,
 	PhysicsUpdateFunction,
 } from '@daneren2005/shared-memory-physics';
-import type { ComponentSystemCallbacks, EntityQueryComponents, UpdateEntityConfigObject } from '@daneren2005/shared-memory-ecs';
+import type { EntityWorkerSystemCallbacks, EntityQueryComponents, UpdateEntityConfigObject } from '@daneren2005/shared-memory-ecs';
 import type { Components } from '../components';
-import type { CustomSystemWorld } from './game-component-system';
+import type { CustomSystemWorld } from './game-entity-worker-system';
 import computeAngle from '@/math/compute-angle';
 import { HEALTH_SHIELDS, HEALTH_TIME_SINCE_DAMAGE, HEALTH_DAMAGE_COOLDOWN } from '../components/health';
 import { CONTROLLER_MONEY, CONTROLLER_MONEY_MULT, CONTROLLER_MULT_SCALE } from '../components/controller';
@@ -67,7 +67,7 @@ const physics = createPhysicsUpdate<Components, GamePhysicsComponents, CustomSys
 
 // The library doesn't bound travel, so wall-bouncing happens here, on the position physics just wrote.
 export const physicsUpdate: PhysicsUpdateFunction<Components, GamePhysicsComponents, CustomSystemWorld> = Object.assign(
-	(world: CustomSystemWorld, entityId: number, components: GamePhysicsComponents, queries: EntityQueryComponents<Components>, callbacks: ComponentSystemCallbacks<Components>) => {
+	(world: CustomSystemWorld, entityId: number, components: GamePhysicsComponents, queries: EntityQueryComponents<Components>, callbacks: EntityWorkerSystemCallbacks<Components>) => {
 		physics(world, entityId, components, queries, callbacks);
 		// A projectile expires on its lifetime (see update-projectiles) rather than bouncing.
 		if(!components.projectile && bounceOffWalls(world, components)) {
@@ -81,7 +81,7 @@ export const physicsUpdate: PhysicsUpdateFunction<Components, GamePhysicsCompone
 			world: CustomSystemWorld,
 			entities: Array<UpdateEntityConfigObject<GamePhysicsComponents>>,
 			queries: EntityQueryComponents<Components>,
-			callbacks: ComponentSystemCallbacks<Components>,
+			callbacks: EntityWorkerSystemCallbacks<Components>,
 		) {
 			physics.preRun?.(world, entities, queries, callbacks);
 
@@ -165,7 +165,7 @@ function collide(
 	self: MovingEntity<GamePhysicsComponents>,
 	other: CollisionEntity<GamePhysicsComponents>,
 	queries: EntityQueryComponents<Components>,
-	callbacks: ComponentSystemCallbacks<Components>,
+	callbacks: EntityWorkerSystemCallbacks<Components>,
 ) {
 	// A projectile (a sensor) and a detonator each resolve the whole collision one-sidedly. The library reports a
 	// pair once, for whichever moved first, so that side can arrive as either `self` or `other` - resolve by role,
@@ -201,7 +201,7 @@ function collide(
 }
 
 // One-sided: deals damage, pays the owner on a kill, then is consumed. A target mid-cooldown shrugs it off.
-function projectileHit(self: Combatant, other: Combatant, callbacks: ComponentSystemCallbacks<Components>) {
+function projectileHit(self: Combatant, other: Combatant, callbacks: EntityWorkerSystemCallbacks<Components>) {
 	if(!canTakeDamage(other)) {
 		return;
 	}
@@ -221,7 +221,7 @@ function isDetonator(combatant: Combatant): boolean {
 }
 
 // Deals contact damage to every enemy within `blastRadius` of the contact point, then dies.
-function detonate(self: Combatant, callbacks: ComponentSystemCallbacks<Components>) {
+function detonate(self: Combatant, callbacks: EntityWorkerSystemCallbacks<Components>) {
 	const combat = self.components.combat;
 	const body = self.components.body;
 	const transform = self.components.transform;
@@ -274,7 +274,7 @@ function detonate(self: Combatant, callbacks: ComponentSystemCallbacks<Component
 
 // Damages a collidable by eid (for the blast, which reaches entities on neither side of a reported collision).
 // Mirrors takeDamage's cooldown gate + station-takes-its-fleet rule; returns whether the hit was fatal.
-function damageEid(eid: number, damage: number, callbacks: ComponentSystemCallbacks<Components>): boolean {
+function damageEid(eid: number, damage: number, callbacks: EntityWorkerSystemCallbacks<Components>): boolean {
 	const blocks = blocksByEid[eid];
 	const health = blocks?.health;
 	if(!health) {
@@ -301,7 +301,7 @@ function damageEid(eid: number, damage: number, callbacks: ComponentSystemCallba
 	return true;
 }
 
-function exchangeDamage(self: Combatant, other: Combatant, callbacks: ComponentSystemCallbacks<Components>) {
+function exchangeDamage(self: Combatant, other: Combatant, callbacks: EntityWorkerSystemCallbacks<Components>) {
 	if(!canTakeDamage(self) || !canTakeDamage(other)) {
 		return;
 	}
@@ -320,7 +320,7 @@ function exchangeDamage(self: Combatant, other: Combatant, callbacks: ComponentS
 	}
 }
 
-function takeDamage(combatant: Combatant, damage: number, callbacks: ComponentSystemCallbacks<Components>) {
+function takeDamage(combatant: Combatant, damage: number, callbacks: EntityWorkerSystemCallbacks<Components>) {
 	const health = combatant.components.health;
 	if(!health) {
 		return;
@@ -344,7 +344,7 @@ function takeDamage(combatant: Combatant, damage: number, callbacks: ComponentSy
 	}
 }
 
-function kill(entityId: number, entity: Uint32Array | undefined, callbacks: ComponentSystemCallbacks<Components>) {
+function kill(entityId: number, entity: Uint32Array | undefined, callbacks: EntityWorkerSystemCallbacks<Components>) {
 	if(!entity) {
 		return;
 	}

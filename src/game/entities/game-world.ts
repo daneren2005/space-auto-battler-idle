@@ -3,7 +3,7 @@ import { PhysicalWorld } from '@daneren2005/shared-memory-physics';
 import Rand from 'rand-seed';
 import { registry } from '../components';
 import type { Components, Config } from '../components';
-import type { Bounds } from '../systems/game-component-system';
+import type { Bounds } from '../systems/game-entity-worker-system';
 import { entityConfigs } from '@/data/entities';
 
 import { createPhysicsSystem, type GamePhysicsSystem } from '../systems/physics-system';

@@ -443,26 +443,27 @@ describe('GameWorld prestige multipliers', () => {
 	});
 });
 
+async function loadOneShip(): Promise<{ gameWorld: GameWorld, ship: ReturnType<GameWorld['loadEntity']> }> {
+	const gameWorld = new GameWorld();
+	gameWorld.load({
+		bounds: { width: 400, height: 400 },
+		entities: [
+			{ type: 'station', color: RED, ...RED_FACTION, x: 20, y: 20 },
+		],
+	});
+	await gameWorld.init();
+
+	const station = entityList(gameWorld)[0];
+	const ship = gameWorld.loadEntity({ type: 'skiff', x: 200, y: 200, owner: station.eid, ...RED_FACTION, velocityX: 100, velocityY: 0 });
+
+	return { gameWorld, ship };
+}
+
 // Physics runs on a fixed 50ms step, so a ship's transform only changes on one frame in three.  What the sprites
 // are actually drawn from is the interpolation component, filled in every frame from the two positions physics
 // published either side of its last step - so these check the wiring rather than the blend itself, which
 // shared-memory-physics owns and tests.
 describe('GameWorld interpolation', () => {
-	async function loadOneShip(): Promise<{ gameWorld: GameWorld, ship: ReturnType<GameWorld['loadEntity']> }> {
-		const gameWorld = new GameWorld();
-		gameWorld.load({
-			bounds: { width: 400, height: 400 },
-			entities: [
-				{ type: 'station', color: RED, ...RED_FACTION, x: 20, y: 20 },
-			],
-		});
-		await gameWorld.init();
-
-		const station = entityList(gameWorld)[0];
-		const ship = gameWorld.loadEntity({ type: 'skiff', x: 200, y: 200, owner: station.eid, ...RED_FACTION, velocityX: 100, velocityY: 0 });
-
-		return { gameWorld, ship };
-	}
 
 	it('gives a ship a render position and a station none', async () => {
 		const { gameWorld, ship } = await loadOneShip();
@@ -498,22 +499,23 @@ describe('GameWorld interpolation', () => {
 	});
 });
 
-describe('GameWorld targeting', () => {
-	// The two stations every targeting test needs: one of each colour, with no spawn rate so no ship launches on
-	// its own and the only ships in the world are the ones the test placed.
-	async function loadTwoStations(): Promise<GameWorld> {
-		const gameWorld = new GameWorld();
-		gameWorld.load({
-			bounds: { width: 400, height: 400 },
-			entities: [
-				{ type: 'station', color: RED, ...RED_FACTION, x: 20, y: 20 },
-				{ type: 'station', color: BLUE, ...BLUE_FACTION, x: 380, y: 380 },
-			],
-		});
-		await gameWorld.init();
+// The two stations every targeting test needs: one of each colour, with no spawn rate so no ship launches on
+// its own and the only ships in the world are the ones the test placed.
+async function loadTwoStations(): Promise<GameWorld> {
+	const gameWorld = new GameWorld();
+	gameWorld.load({
+		bounds: { width: 400, height: 400 },
+		entities: [
+			{ type: 'station', color: RED, ...RED_FACTION, x: 20, y: 20 },
+			{ type: 'station', color: BLUE, ...BLUE_FACTION, x: 380, y: 380 },
+		],
+	});
+	await gameWorld.init();
 
-		return gameWorld;
-	}
+	return gameWorld;
+}
+
+describe('GameWorld targeting', () => {
 
 	it('picks the nearest enemy ship', async () => {
 		world = await loadTwoStations();

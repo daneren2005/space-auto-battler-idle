@@ -113,23 +113,24 @@ describe('stationState', () => {
 	});
 });
 
-describe('matchOutcome', () => {
-	async function loadTwoStations(): Promise<{ player: Station, enemy: Station }> {
-		const gameWorld = new GameWorld();
-		gameWorld.load({
-			bounds: { width: 400, height: 400 },
-			entities: [
-				{ type: 'station', color: 0x00ff00, player: true, ...factionCollision(0), x: 100, y: 300 },
-				{ type: 'station', color: 0xff0000, ...factionCollision(1), x: 300, y: 100 },
-			],
-		});
-		await gameWorld.init();
-		world = gameWorld;
+async function loadTwoStations(): Promise<{ player: Station, enemy: Station }> {
+	const gameWorld = new GameWorld();
+	gameWorld.load({
+		bounds: { width: 400, height: 400 },
+		entities: [
+			{ type: 'station', color: 0x00ff00, player: true, ...factionCollision(0), x: 100, y: 300 },
+			{ type: 'station', color: 0xff0000, ...factionCollision(1), x: 300, y: 100 },
+		],
+	});
+	await gameWorld.init();
+	world = gameWorld;
 
-		const player = entityList(gameWorld).find(entity => entity.components.controller?.player)!;
-		const enemy = entityList(gameWorld).find(entity => !entity.components.controller?.player)!;
-		return { player, enemy };
-	}
+	const player = entityList(gameWorld).find(entity => entity.components.controller?.player)!;
+	const enemy = entityList(gameWorld).find(entity => !entity.components.controller?.player)!;
+	return { player, enemy };
+}
+
+describe('matchOutcome', () => {
 
 	it('is playing while both stations stand', async() => {
 		const { player } = await loadTwoStations();
